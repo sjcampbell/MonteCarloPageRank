@@ -28,12 +28,12 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
 
 /**
- * Simple 2-letter prefix count demo.
+ * Simple word count demo.
  */
-public class PrefixCount extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(PrefixCount.class);
+public class WordCount extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(WordCount.class);
 
-  // Mapper: emits (token, 1) for every 2-letter word prefix occurrence.
+  // Mapper: emits (token, 1) for every word occurrence.
   private static class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
@@ -47,9 +47,7 @@ public class PrefixCount extends Configured implements Tool {
       while (itr.hasMoreTokens()) {
         String w = itr.nextToken().toLowerCase().replaceAll("(^[^a-z]+|[^a-z]+$)", "");
 
-        if (w.length() < 2) continue;
-
-        WORD.set(w.substring(0, 2));
+        if (w.length() == 0) continue;
         context.write(WORD, ONE);
       }
     }
@@ -65,8 +63,8 @@ public class PrefixCount extends Configured implements Tool {
       StringTokenizer itr = new StringTokenizer(line);
       while (itr.hasMoreTokens()) {
         String w = itr.nextToken().toLowerCase().replaceAll("(^[^a-z]+|[^a-z]+$)", "");
-        if (w.length() < 2) continue;
-        w = w.substring(0, 2);
+        if (w.length() == 0) continue;
+
         if (counts.containsKey(w)) {
           counts.put(w, counts.get(w)+1);
         } else {
@@ -110,7 +108,7 @@ public class PrefixCount extends Configured implements Tool {
   /**
    * Creates an instance of this tool.
    */
-  public PrefixCount() {}
+  public WordCount() {}
 
   public static class Args {
     @Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
@@ -141,7 +139,7 @@ public class PrefixCount extends Configured implements Tool {
       return -1;
     }
 
-    LOG.info("Tool: " + PrefixCount.class.getSimpleName());
+    LOG.info("Tool: " + WordCount.class.getSimpleName());
     LOG.info(" - input path: " + args.input);
     LOG.info(" - output path: " + args.output);
     LOG.info(" - number of reducers: " + args.numReducers);
@@ -149,8 +147,8 @@ public class PrefixCount extends Configured implements Tool {
 
     Configuration conf = getConf();
     Job job = Job.getInstance(conf);
-    job.setJobName(PrefixCount.class.getSimpleName());
-    job.setJarByClass(PrefixCount.class);
+    job.setJobName(WordCount.class.getSimpleName());
+    job.setJarByClass(WordCount.class);
 
     job.setNumReduceTasks(args.numReducers);
 
@@ -182,6 +180,6 @@ public class PrefixCount extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    ToolRunner.run(new PrefixCount(), args);
+    ToolRunner.run(new WordCount(), args);
   }
 }
