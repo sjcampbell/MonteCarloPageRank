@@ -1,10 +1,6 @@
 package ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment1;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,9 +11,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
@@ -44,11 +40,13 @@ import com.google.common.collect.Sets;
 import tl.lin.data.pair.PairOfStrings;
 
 /**
- * Simple word count demo.
+ * Calculating Pointwise Mutual Information
  */
 public class PairsPMI extends Configured implements Tool {
 	private static final Logger LOG = Logger.getLogger(PairsPMI.class);
 
+	private static final String LineCountProperty = "PmiLineCount";
+	
 	private enum Count {
 		LINES
 	}
@@ -57,54 +55,6 @@ public class PairsPMI extends Configured implements Tool {
 		// Reuse objects to save overhead of object creation.
 		private final static IntWritable ONE = new IntWritable(1);
 		private final static PairOfStrings PAIR = new PairOfStrings();
-		private static HashMap<Text, IntWritable> wordCounts = new HashMap<>();
-		
-		@Override
-		protected void setup(Context context) throws IOException {
-			Configuration conf = context.getConfiguration();
-			URI[] fileUris = context.getCacheFiles();
-			for(URI fileUri : fileUris) {
-				System.out.println("Found cached file: " + fileUri.toString());
-				
-				if (fileUri.toString().contains("part-r-")) {
-					SequenceFile.Reader reader = new SequenceFile.Reader(conf, Reader.file(new Path(fileUri)));
-					try
-					{
-						Text key = new Text();
-					    IntWritable value = new IntWritable();
-					
-					    int count = 0;
-					    
-					    while(reader.next(key, value)) {
-					    	count++;
-					    	wordCounts.put(key, value);
-					    }
-					    
-					    System.out.println("Read in " + count + " key/values from cached file.");
-					}
-					catch (Exception ex) {
-						System.err.println("Error: Failed to read first key from sequence file: " + fileUri.toString());
-				    	throw ex;
-					}
-					finally{
-						reader.close();
-					}
-				}
-				
-				/* TODO: This would be useful with a text type output.
-				 * if (fileUri.toString().endsWith(".dat")) {
-					
-					// TODO: Read file and fill in wordCounts;
-					File cacheFile = new File(fileUri);
-					FileInputStream fis = new FileInputStream(cacheFile);
-					BufferedReader br = new BufferedReader(new InputStreamReader(fis));
-					
-					String line = null;
-					while ((line=br.readLine()) != null) {
-						// Parse line and put it into the HashMap
-					}*/
-			}
-		}
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context)
@@ -135,19 +85,14 @@ public class PairsPMI extends Configured implements Tool {
 					
 					PAIR.set(words[i], words[j]);
 					context.write(PAIR, ONE);
-				
-					PAIR.set(words[i], "*");
-					context.write(PAIR, ONE);
 				}
 			}
 		}
 	}
-
-	// Reducer: sums up all the counts.
-	protected static class PmiReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
-		// Reuse objects.
+	
+	protected static class PmiCombiner extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
 		private final static IntWritable SUM = new IntWritable();
-
+		
 		@Override
 		public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
 				throws IOException, InterruptedException {
@@ -161,6 +106,83 @@ public class PairsPMI extends Configured implements Tool {
 			context.write(key, SUM);
 		}
 	}
+
+	// Reducer: sums up all the counts.
+	protected static class PmiReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, DoubleWritable> {
+		private final static DoubleWritable PMI = new DoubleWritable();
+		private static HashMap<String, Integer> wordCounts = new HashMap<>();
+		private static int lineCount;
+		
+		@Override
+		protected void setup(Context context) throws IOException {
+			Configuration conf = context.getConfiguration();
+			
+			lineCount = conf.getInt(LineCountProperty, -1);
+			
+			URI[] fileUris = context.getCacheFiles();
+			for(URI fileUri : fileUris) {
+				System.out.println("Found cached file: " + fileUri.toString());
+				
+				if (fileUri.toString().contains("part-r-")) {
+					SequenceFile.Reader reader = new SequenceFile.Reader(conf, Reader.file(new Path(fileUri)));
+					try
+					{
+						Text key = new Text();
+					    IntWritable value = new IntWritable();
+					
+					    int count = 0;
+					    
+					    while(reader.next(key, value)) {
+					    	count++;
+					    	wordCounts.put(key.toString(), value.get());
+					    }
+					    
+					    System.out.println("Read in " + count + " key/values from cached file.");
+					    System.out.println("Last key: " + key + ", last value: " + value);
+					}
+					catch (Exception ex) {
+						System.err.println("Error: Failed to read first key from sequence file: " + fileUri.toString());
+				    	throw ex;
+					}
+					finally{
+						reader.close();
+					}
+				}
+			}
+		}
+		
+		@Override
+		public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+				throws IOException, InterruptedException {
+			// Sum up values.
+			Iterator<IntWritable> iter = values.iterator();
+			int sum = 0;
+			while (iter.hasNext()) {
+				sum += iter.next().get();
+			}
+			
+			// Calculate  N*c(x,y)/(c(x)*c(y))
+			// c()	: Count function 
+			// N	: Total number of lines
+			String wordx = key.getKey();
+			String wordy = key.getValue();
+			float cx = wordCounts.get(wordx);
+			float cy = wordCounts.get(wordy);
+			
+			if (cx == 0) {
+				System.err.println("Word count was 0 for c(x), x: " + key.getKey());
+				return;
+			}
+			else if (cy == 0) {
+				System.err.println("Word count was 0 for c(y), y: " + key.getValue());
+				return;
+			}
+			
+			double pmi = Math.log10(lineCount * sum / (cx * cy));
+			PMI.set(pmi);
+			context.write(key, PMI);
+		}
+	}
 	
 	protected static class PmiPartitioner extends Partitioner<PairOfStrings, IntWritable> {
 	    @Override
@@ -170,7 +192,7 @@ public class PairsPMI extends Configured implements Tool {
 	  }
 
 	/*
-	 * Mapper and Reducer to calculate relative frequencies of all words in the input.
+	 * Mapper and Reducer to calculate word count in the input
 	 */
 	private static class WordCountMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
 		private final static IntWritable ONE = new IntWritable(1);
@@ -266,14 +288,15 @@ public class PairsPMI extends Configured implements Tool {
 		
 		// Delete the intermediate directory if it exists already.
 		FileSystem.get(conf).delete(intermediate, true);
-		
+
+		long totalStartTime = System.currentTimeMillis();
 		long startTime = System.currentTimeMillis();
 		jobWC.waitForCompletion(true);
 		LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
 		long lineCount = jobWC.getCounters().findCounter(Count.LINES).getValue();
 
-		conf.setLong("PmiLineCount", lineCount);
+		conf.setLong(LineCountProperty, lineCount);
 		System.out.println("Line counter result: " + lineCount);
 		
 		// Job 2 - PMI Calculation
@@ -286,9 +309,7 @@ public class PairsPMI extends Configured implements Tool {
 		FileInputFormat.setInputPaths(jobPmi, new Path(args.input));
 		FileOutputFormat.setOutputPath(jobPmi, new Path(args.output));
 		
-		// TODO: Change combiner all up in here.
 		configureJobPmiTypes(jobPmi);
-		//addSingleFileToCache(conf, jobPmi, intermediate);
 		addJobOutputToCache(conf, jobPmi, intermediate);
 		
 		// Delete the output directory if it exists
@@ -297,6 +318,7 @@ public class PairsPMI extends Configured implements Tool {
 		long startTime2 = System.currentTimeMillis();
 		jobPmi.waitForCompletion(true);
 		LOG.info("Pointwise mutual information job finished in " + (System.currentTimeMillis() - startTime2) / 1000.0 + " seconds");
+		LOG.info("Overall Job Finished in " + (System.currentTimeMillis() - totalStartTime) / 1000.0 + " seconds");
 		
 		return 0;
 	}
@@ -323,15 +345,6 @@ public class PairsPMI extends Configured implements Tool {
 			job.addCacheFile(fileList[i].getPath().toUri());
 		}
 	}
-
-	private void addSingleFileToCache(Configuration config, Job job, Path filePath) throws IOException {
-		FileSystem fs = FileSystem.get(config);
-		Path dstFile = new Path(filePath + ".dat");
-		
-		// Merge and cache output file.
-		FileUtil.copyMerge(fs, filePath, fs, dstFile, false, config, null);
-		job.addCacheFile(dstFile.toUri());
-	}
 	
 	private void configureJobWcTypes(Job jobRF) {
 		jobRF.setMapOutputKeyClass(Text.class);
@@ -352,9 +365,7 @@ public class PairsPMI extends Configured implements Tool {
 		jobPmi.setOutputFormatClass(TextOutputFormat.class);
 		jobPmi.setMapperClass(PmiMapper.class);
 		jobPmi.setReducerClass(PmiReducer.class);
-		
-		// TODO: Change the combiner.
-		// jobPmi.setCombinerClass(PmiReducer.class);
+		jobPmi.setCombinerClass(PmiCombiner.class);
 	}
 	
 	/**
