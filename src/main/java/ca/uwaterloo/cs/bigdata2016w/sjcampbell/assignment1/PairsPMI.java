@@ -78,6 +78,25 @@ public class PairsPMI extends Configured implements Tool {
 			words = set.toArray(words);
 
 			for (int i = 0; i < set.size() - 1; i++)
+	 		{
+	 			for (int j = i + 1; j < set.size() - 1; j++)
+	 			{
+	 				// TODO: Temporary to find number of unique word pairs
+	 				if (words[i].compareTo(words[j]) < 0)
+	 				{
+	 					PAIR.set(words[i], words[j]);
+	 				}
+	 				else
+	 				{
+	 					PAIR.set(words[j], words[i]);
+	 				}
+	 				
+	 				context.write(PAIR, ONE);
+	 			}
+	 		}
+			
+			/*
+			for (int i = 0; i < set.size() - 1; i++)
 			{
 				for (int j = 0; j < set.size(); j++)
 				{
@@ -87,6 +106,7 @@ public class PairsPMI extends Configured implements Tool {
 					context.write(PAIR, ONE);
 				}
 			}
+			*/
 		}
 	}
 	
@@ -102,6 +122,7 @@ public class PairsPMI extends Configured implements Tool {
 			while (iter.hasNext()) {
 				sum += iter.next().get();
 			}
+			
 			SUM.set(sum);
 			context.write(key, SUM);
 		}
@@ -160,6 +181,11 @@ public class PairsPMI extends Configured implements Tool {
 			while (iter.hasNext()) {
 				sum += iter.next().get();
 			}
+			
+			/*if (sum < 10) {
+				// Ignore pairs that appear on less than 10 lines.
+				return;
+			}*/
 			
 			// Calculate  N*c(x,y)/(c(x)*c(y))
 			// c()	: Count function 
@@ -309,7 +335,7 @@ public class PairsPMI extends Configured implements Tool {
 		FileInputFormat.setInputPaths(jobPmi, new Path(args.input));
 		FileOutputFormat.setOutputPath(jobPmi, new Path(args.output));
 		
-		configureJobPmiTypes(jobPmi);
+		configureJobPmiParameters(jobPmi);
 		addJobOutputToCache(conf, jobPmi, intermediate);
 		
 		// Delete the output directory if it exists
@@ -357,7 +383,7 @@ public class PairsPMI extends Configured implements Tool {
 		jobRF.setReducerClass(WordCountReducer.class);
 	}
 	
-	private void configureJobPmiTypes(Job jobPmi) {
+	private void configureJobPmiParameters(Job jobPmi) {
 		jobPmi.setMapOutputKeyClass(PairOfStrings.class);
 		jobPmi.setMapOutputValueClass(IntWritable.class);
 		jobPmi.setOutputKeyClass(PairOfStrings.class);
@@ -366,6 +392,13 @@ public class PairsPMI extends Configured implements Tool {
 		jobPmi.setMapperClass(PmiMapper.class);
 		jobPmi.setReducerClass(PmiReducer.class);
 		jobPmi.setCombinerClass(PmiCombiner.class);
+		jobPmi.setPartitionerClass(PmiPartitioner.class);
+		
+		jobPmi.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 64);
+		jobPmi.getConfiguration().set("mapreduce.map.memory.mb", "3072");
+		jobPmi.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
+		jobPmi.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
+		jobPmi.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
 	}
 	
 	/**
