@@ -21,7 +21,6 @@ import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -78,27 +77,8 @@ public class PairsPMI extends Configured implements Tool {
 			words = set.toArray(words);
 
 			for (int i = 0; i < set.size() - 1; i++)
-	 		{
-	 			for (int j = i + 1; j < set.size() - 1; j++)
-	 			{
-	 				// TODO: Temporary to find number of unique word pairs
-	 				if (words[i].compareTo(words[j]) < 0)
-	 				{
-	 					PAIR.set(words[i], words[j]);
-	 				}
-	 				else
-	 				{
-	 					PAIR.set(words[j], words[i]);
-	 				}
-	 				
-	 				context.write(PAIR, ONE);
-	 			}
-	 		}
-			
-			/*
-			for (int i = 0; i < set.size() - 1; i++)
 			{
-				for (int j = 0; j < set.size(); j++)
+				for (int j = 0; j < set.size() - 1; j++)
 				{
 					if (i == j) continue;
 					
@@ -106,7 +86,6 @@ public class PairsPMI extends Configured implements Tool {
 					context.write(PAIR, ONE);
 				}
 			}
-			*/
 		}
 	}
 	
@@ -162,7 +141,7 @@ public class PairsPMI extends Configured implements Tool {
 					    System.out.println("Last key: " + key + ", last value: " + value);
 					}
 					catch (Exception ex) {
-						System.err.println("Error: Failed to read first key from sequence file: " + fileUri.toString());
+						System.err.println("Error: Failed while reading sequence file in PMI reducer setup: " + fileUri.toString());
 				    	throw ex;
 					}
 					finally{
@@ -182,40 +161,34 @@ public class PairsPMI extends Configured implements Tool {
 				sum += iter.next().get();
 			}
 			
-			/*if (sum < 10) {
+			if (sum < 10) {
 				// Ignore pairs that appear on less than 10 lines.
 				return;
-			}*/
+			}
 			
 			// Calculate  N*c(x,y)/(c(x)*c(y))
 			// c()	: Count function 
 			// N	: Total number of lines
 			String wordx = key.getKey();
 			String wordy = key.getValue();
-			float cx = wordCounts.get(wordx);
-			float cy = wordCounts.get(wordy);
+			double cx = wordCounts.get(wordx);
+			double cy = wordCounts.get(wordy);
 			
 			if (cx == 0) {
-				System.err.println("Word count was 0 for c(x), x: " + key.getKey());
+				LOG.error("Word count was 0 for c(x), x: " + key.getKey());
 				return;
 			}
 			else if (cy == 0) {
-				System.err.println("Word count was 0 for c(y), y: " + key.getValue());
+				LOG.error("Word count was 0 for c(y), y: " + key.getValue());
 				return;
 			}
 			
-			double pmi = Math.log10(lineCount * sum / (cx * cy));
+			double pmi = Math.log10((double)lineCount * sum / (cx * cy));
 			PMI.set(pmi);
 			context.write(key, PMI);
 		}
 	}
 	
-	protected static class PmiPartitioner extends Partitioner<PairOfStrings, IntWritable> {
-	    @Override
-	    public int getPartition(PairOfStrings key, IntWritable value, int numReduceTasks) {
-	      return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
-	    }
-	  }
 
 	/*
 	 * Mapper and Reducer to calculate word count in the input
@@ -246,6 +219,7 @@ public class PairsPMI extends Configured implements Tool {
 			}
 		}
 	}
+	
 
 	private static class WordCountReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
 		private final static IntWritable SUM = new IntWritable();
@@ -283,6 +257,7 @@ public class PairsPMI extends Configured implements Tool {
 		boolean imc = false;
 	}
 
+	
 	/**
 	 * Runs this tool.
 	 */
@@ -348,6 +323,7 @@ public class PairsPMI extends Configured implements Tool {
 		
 		return 0;
 	}
+	
 
 	private void logArguments(Args args) {
 		LOG.info("Tool: " + PairsPMI.class.getSimpleName());
@@ -358,6 +334,7 @@ public class PairsPMI extends Configured implements Tool {
 
 	// Thanks to @foxroot
 	// http://stackoverflow.com/a/30230251/2565692
+	
 	private void addJobOutputToCache(Configuration config, Job job, Path filePath) throws IOException {
 		FileSystem fs = FileSystem.get(config);
 		FileStatus[] fileList = fs.listStatus(filePath, 
@@ -372,6 +349,7 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 	
+	
 	private void configureJobWcTypes(Job jobRF) {
 		jobRF.setMapOutputKeyClass(Text.class);
 		jobRF.setMapOutputValueClass(IntWritable.class);
@@ -383,16 +361,16 @@ public class PairsPMI extends Configured implements Tool {
 		jobRF.setReducerClass(WordCountReducer.class);
 	}
 	
+	
 	private void configureJobPmiParameters(Job jobPmi) {
 		jobPmi.setMapOutputKeyClass(PairOfStrings.class);
 		jobPmi.setMapOutputValueClass(IntWritable.class);
 		jobPmi.setOutputKeyClass(PairOfStrings.class);
-		jobPmi.setOutputValueClass(IntWritable.class);
+		jobPmi.setOutputValueClass(DoubleWritable.class);
 		jobPmi.setOutputFormatClass(TextOutputFormat.class);
 		jobPmi.setMapperClass(PmiMapper.class);
 		jobPmi.setReducerClass(PmiReducer.class);
 		jobPmi.setCombinerClass(PmiCombiner.class);
-		jobPmi.setPartitionerClass(PmiPartitioner.class);
 		
 		jobPmi.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 64);
 		jobPmi.getConfiguration().set("mapreduce.map.memory.mb", "3072");
@@ -400,6 +378,7 @@ public class PairsPMI extends Configured implements Tool {
 		jobPmi.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
 		jobPmi.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
 	}
+	
 	
 	/**
 	 * Dispatches command-line arguments to the tool via the {@code ToolRunner}.

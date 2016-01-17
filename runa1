@@ -1,0 +1,5 @@
+hadoop jar target/bigdata2016w-0.1.0-SNAPSHOT.jar ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment1.PairsPMI -input data/Shakespeare.txt -output a1-ppmi-shakespeare-output
+
+# ANALYZING OUTPUT
+# Ex. This command finds the PMI pairs with "tears" and sorts highest to lowest.
+# hadoop fs -cat a1-ppmi-test2/part-r-0000* | grep '(tears, ' | grep -v "E-" | sort -r -t$'\t' -nk2
