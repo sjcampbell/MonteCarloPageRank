@@ -5,7 +5,9 @@ Assignment 0
 
 *Pairs* - The solution I've implemented for calculating PMI using the pairs technique uses two mapreduce jobs. The first job is a simple unique word count that outputs a sequence file of unique word/count pairs that is easy to read as key/value pairs in future jobs. It also uses a custom counter to count the number of lines seen by all mappers. The second mapreduce job starts off with the same input to the mapper as the word count job. The mapper splits up the words and emits all unique pairs and a count of one as intermediate key-value pairs, which then get summed by a combiner to reduce the amount of intermediate data being shuffled. The reducer is where the PMI calculation takes place. It side-loads in the word counts from the first job to a hash map and reads in the line count to complete the PMI calculation. The final output records are word pairs with their PMI calculations (ex: "(word1, word2) 0.123").
 
-*Stripes:* - 
+*Stripes:* - The stripes solution also uses two mapreduce jobs. The first is exactly the same as the one used in the pairs approach to calculate word counts and the total number of lines. The second mapreduce job is used to calculate PMI.
+
+** TODO:** Finish stripes approach description.
 
 
 

@@ -14,8 +14,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -108,37 +106,9 @@ public class PairsPMI extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
 			
 			lineCount = conf.getInt(PmiConfiguration.LineCountProperty, -1);
-			
 			URI[] fileUris = context.getCacheFiles();
-			for(URI fileUri : fileUris) {
-				System.out.println("Found cached file: " + fileUri.toString());
-				
-				if (fileUri.toString().contains("part-r-")) {
-					SequenceFile.Reader reader = new SequenceFile.Reader(conf, Reader.file(new Path(fileUri)));
-					try
-					{
-						Text key = new Text();
-					    IntWritable value = new IntWritable();
-					
-					    int count = 0;
-					    
-					    while(reader.next(key, value)) {
-					    	count++;
-					    	wordCounts.put(key.toString(), value.get());
-					    }
-					    
-					    System.out.println("Read in " + count + " key/values from cached file.");
-					    System.out.println("Last key: " + key + ", last value: " + value);
-					}
-					catch (Exception ex) {
-						System.err.println("Error: Failed while reading sequence file in PMI reducer setup: " + fileUri.toString());
-				    	throw ex;
-					}
-					finally{
-						reader.close();
-					}
-				}
-			}
+			PmiConfiguration pmiConfig = new PmiConfiguration(StripesPMI.class, conf);
+			wordCounts = pmiConfig.GetDistributedCacheMap(fileUris); 
 		}
 		
 		@Override
@@ -165,11 +135,11 @@ public class PairsPMI extends Configured implements Tool {
 			double cy = wordCounts.get(wordy);
 			
 			if (cx == 0) {
-				LOG.error("Word count was 0 for c(x), x: " + key.getKey());
+				LOG.error("Word count was 0 for c(x), x: " + wordx);
 				return;
 			}
 			else if (cy == 0) {
-				LOG.error("Word count was 0 for c(y), y: " + key.getValue());
+				LOG.error("Word count was 0 for c(y), y: " + wordy);
 				return;
 			}
 			
@@ -201,10 +171,10 @@ public class PairsPMI extends Configured implements Tool {
 
 		// Set up and run word count job
 		Configuration conf = getConf();
-		PmiConfiguration pmiConfig = new PmiConfiguration(PairsPMI.class, conf, args);
+		PmiConfiguration pmiConfig = new PmiConfiguration(PairsPMI.class, conf);
 
-		Path intermediate = new Path(args.output + "_int");
-		Job jobWC = pmiConfig.SetupWordCountJob(intermediate);
+		Path intermediateDir = new Path(args.output + "_int");
+		Job jobWC = pmiConfig.SetupWordCountJob(intermediateDir, args);
 		long totalStartTime = System.currentTimeMillis();
 		long lineCount = pmiConfig.RunWordCountJob(jobWC);
 		
@@ -222,7 +192,7 @@ public class PairsPMI extends Configured implements Tool {
 		FileOutputFormat.setOutputPath(jobPmi, new Path(args.output));
 		
 		configureJobPmiParameters(jobPmi);
-		pmiConfig.AddJobOutputToCache(conf, jobPmi, intermediate);
+		pmiConfig.AddFilesInPathToJobCache(conf, jobPmi, intermediateDir);
 		
 		// Delete the output directory if it exists
 		FileSystem.get(conf).delete(outputDir, true);
