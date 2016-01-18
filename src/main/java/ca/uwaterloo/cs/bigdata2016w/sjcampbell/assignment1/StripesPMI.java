@@ -62,11 +62,11 @@ public class StripesPMI extends Configured implements Tool {
 			words = set.toArray(words);
 
 			// For each word on the line emit it as the key with the rest of the words in a map.
-			for (int i = 0; i < set.size() - 1; i++)
+			for (int i = 0; i < set.size(); i++)
 			{
 				MAP.clear();
 				
-				for (int j = 0; j < set.size() - 1; j++)
+				for (int j = 0; j < set.size(); j++)
 				{
 					if (i == j) continue;
 					MAP.increment(words[j]);
@@ -121,7 +121,7 @@ public class StripesPMI extends Configured implements Tool {
 			// Write the word pairs one at a time, calculating the PMI for each pair.
 			Entry<String>[] mapEntries = map.getEntriesSortedByKey();
 			if (mapEntries == null) {
-				LOG.error("There were no map entries for key: " + key);
+				LOG.info("There were no map entries for key: " + key);
 				return;
 			}
 			

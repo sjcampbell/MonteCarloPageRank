@@ -64,9 +64,9 @@ public class PairsPMI extends Configured implements Tool {
 			String[] words = new String[set.size()];
 			words = set.toArray(words);
 
-			for (int i = 0; i < set.size() - 1; i++)
+			for (int i = 0; i < set.size(); i++)
 			{
-				for (int j = 0; j < set.size() - 1; j++)
+				for (int j = 0; j < set.size(); j++)
 				{
 					if (i == j) continue;
 					
