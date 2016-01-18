@@ -9,10 +9,8 @@ import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -24,14 +22,12 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
 
 import com.google.common.collect.Sets;
@@ -43,12 +39,6 @@ import tl.lin.data.pair.PairOfStrings;
  */
 public class PairsPMI extends Configured implements Tool {
 	private static final Logger LOG = Logger.getLogger(PairsPMI.class);
-
-	private static final String LineCountProperty = "PmiLineCount";
-	
-	private enum Count {
-		LINES
-	}
 	
 	public static class PmiMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
 		// Reuse objects to save overhead of object creation.
@@ -117,7 +107,7 @@ public class PairsPMI extends Configured implements Tool {
 		protected void setup(Context context) throws IOException {
 			Configuration conf = context.getConfiguration();
 			
-			lineCount = conf.getInt(LineCountProperty, -1);
+			lineCount = conf.getInt(PmiConfiguration.LineCountProperty, -1);
 			
 			URI[] fileUris = context.getCacheFiles();
 			for(URI fileUri : fileUris) {
@@ -189,75 +179,11 @@ public class PairsPMI extends Configured implements Tool {
 		}
 	}
 	
-
-	/*
-	 * Mapper and Reducer to calculate word count in the input
-	 */
-	private static class WordCountMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
-		private final static IntWritable ONE = new IntWritable(1);
-		private static final Text WORD = new Text();
-		
-		@Override
-		public void map(LongWritable key, Text value, Context context) 
-				throws IOException, InterruptedException {
-			context.getCounter(Count.LINES).increment(1);
-			String line = ((Text)value).toString();
-			StringTokenizer itr = new StringTokenizer(line);
-			Set<String> set = Sets.newHashSet();
-			
-			while(itr.hasMoreTokens()) {
-				String w = itr.nextToken().toLowerCase().replaceAll("(^[^a-z]+|[^a-z]+$)", "");
-				if (w.length() == 0) continue;
-				set.add(w);
-			}
-			
-			if (set.size() == 0) return;
-			
-			for(String s : set) {
-				WORD.set(s);
-				context.write(WORD, ONE);
-			}
-		}
-	}
-	
-
-	private static class WordCountReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
-		private final static IntWritable SUM = new IntWritable();
-
-	    @Override
-	    public void reduce(Text key, Iterable<IntWritable> values, Context context)
-	        throws IOException, InterruptedException {
-	      // Sum up values.
-	      Iterator<IntWritable> iter = values.iterator();
-	      int sum = 0;
-	      while (iter.hasNext()) {
-	        sum += iter.next().get();
-	      }
-	      SUM.set(sum);
-	      context.write(key, SUM);
-	    }
-	}
-	
 	/**
 	 * Creates an instance of this tool.
 	 */
 	public PairsPMI() {}
 
-	public static class Args {
-		@Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
-		public String input;
-
-		@Option(name = "-output", metaVar = "[path]", required = true, usage = "output path")
-		public String output;
-
-		@Option(name = "-reducers", metaVar = "[num]", required = false, usage = "number of reducers")
-		public int numReducers = 1;
-
-		@Option(name = "-imc", usage = "use in-mapper combining")
-		boolean imc = false;
-	}
-
-	
 	/**
 	 * Runs this tool.
 	 */
@@ -273,31 +199,16 @@ public class PairsPMI extends Configured implements Tool {
 			return -1;
 		}
 
-		logArguments(args);
-
+		// Set up and run word count job
 		Configuration conf = getConf();
-		
-		// Job 1 - Word count and total line count
-		Job jobWC = Job.getInstance(conf);
-		jobWC.setJobName(PairsPMI.class.getSimpleName() + "_WordCount");
-		jobWC.setJarByClass(PairsPMI.class);
-		jobWC.setNumReduceTasks(args.numReducers);
+		PmiConfiguration pmiConfig = new PmiConfiguration(PairsPMI.class, conf, args);
+
 		Path intermediate = new Path(args.output + "_int");
-		FileInputFormat.setInputPaths(jobWC, new Path(args.input));
-		FileOutputFormat.setOutputPath(jobWC, intermediate);
-		configureJobWcTypes(jobWC);
-		
-		// Delete the intermediate directory if it exists already.
-		FileSystem.get(conf).delete(intermediate, true);
-
+		Job jobWC = pmiConfig.SetupWordCountJob(intermediate);
 		long totalStartTime = System.currentTimeMillis();
-		long startTime = System.currentTimeMillis();
-		jobWC.waitForCompletion(true);
-		LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
-
-		long lineCount = jobWC.getCounters().findCounter(Count.LINES).getValue();
-
-		conf.setLong(LineCountProperty, lineCount);
+		long lineCount = pmiConfig.RunWordCountJob(jobWC);
+		
+		conf.setLong(PmiConfiguration.LineCountProperty, lineCount);
 		System.out.println("Line counter result: " + lineCount);
 		
 		// Job 2 - PMI Calculation
@@ -311,7 +222,7 @@ public class PairsPMI extends Configured implements Tool {
 		FileOutputFormat.setOutputPath(jobPmi, new Path(args.output));
 		
 		configureJobPmiParameters(jobPmi);
-		addJobOutputToCache(conf, jobPmi, intermediate);
+		pmiConfig.AddJobOutputToCache(conf, jobPmi, intermediate);
 		
 		// Delete the output directory if it exists
 		FileSystem.get(conf).delete(outputDir, true);
@@ -323,44 +234,6 @@ public class PairsPMI extends Configured implements Tool {
 		
 		return 0;
 	}
-	
-
-	private void logArguments(Args args) {
-		LOG.info("Tool: " + PairsPMI.class.getSimpleName());
-		LOG.info(" - input path: " + args.input);
-		LOG.info(" - output path: " + args.output);
-		LOG.info(" - number of reducers: " + args.numReducers);
-	}
-
-	// Thanks to @foxroot
-	// http://stackoverflow.com/a/30230251/2565692
-	
-	private void addJobOutputToCache(Configuration config, Job job, Path filePath) throws IOException {
-		FileSystem fs = FileSystem.get(config);
-		FileStatus[] fileList = fs.listStatus(filePath, 
-                new PathFilter(){
-                      @Override public boolean accept(Path path){
-                             return path.getName().startsWith("part-");
-                      } 
-                 } );
-	
-		for(int i=0; i < fileList.length;i++){
-			job.addCacheFile(fileList[i].getPath().toUri());
-		}
-	}
-	
-	
-	private void configureJobWcTypes(Job jobRF) {
-		jobRF.setMapOutputKeyClass(Text.class);
-		jobRF.setMapOutputValueClass(IntWritable.class);
-		jobRF.setOutputKeyClass(Text.class);
-		jobRF.setOutputValueClass(IntWritable.class);
-		jobRF.setOutputFormatClass(SequenceFileOutputFormat.class);
-		jobRF.setMapperClass(WordCountMapper.class);
-		jobRF.setCombinerClass(WordCountReducer.class);
-		jobRF.setReducerClass(WordCountReducer.class);
-	}
-	
 	
 	private void configureJobPmiParameters(Job jobPmi) {
 		jobPmi.setMapOutputKeyClass(PairOfStrings.class);
@@ -378,7 +251,6 @@ public class PairsPMI extends Configured implements Tool {
 		jobPmi.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
 		jobPmi.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
 	}
-	
 	
 	/**
 	 * Dispatches command-line arguments to the tool via the {@code ToolRunner}.

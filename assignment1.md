@@ -57,3 +57,17 @@ Highest PMI with "death":
 (death, life)	0.7381345918721788  
 (death, die)	0.7293358052746564  
 
+**Question 7.** _(6 points) In the Wikipedia sample, what are the three words that have the highest PMI with "waterloo" and "toronto"? And what are the PMI values?_
+
+Three largets PMI values with "toronto":  
+(toronto, mimico)       1.6847684214104595  
+(toronto, argonauts)    1.5844654655050636  
+(toronto, marlboros)    1.5708250691036227  
+  
+Three largest PMI values with "waterloo":  
+(waterloo, kitchener)   1.6725974629805342  
+(waterloo, napoleonic)  0.7998774154037366  
+(waterloo, napoleon)    0.7889055071141662  
+
+
+
