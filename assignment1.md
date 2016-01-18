@@ -1,4 +1,4 @@
-Assignment 0
+Assignment 1
 ============
 
 **Question 1.** _Briefly describe in prose your solution, both the pairs and stripes implementation. For example: how many MapReduce jobs? What are the input records? What are the intermediate key-value pairs? What are the final output records? A paragraph for each implementation is about the expected length._
@@ -28,10 +28,10 @@ Overall program finished in 15.43 seconds
 **Question 3.** _Now disable all combiners. What is the running time of the complete pairs implementation now? What is the running time of the complete stripes implementation?_  
 These tests were run using the same system described in question 2.
 
-*Pairs*:
-Overall program finished in 33.185 seconds
-	Word count job finished in 6.649 seconds
-	PMI job finished in 26.521 seconds
+*Pairs*:  
+Overall program finished in 33.185 seconds  
+	Word count job finished in 6.649 seconds  
+	PMI job finished in 26.521 seconds  
 	
 *Stripes*:  
 Overall program finished in 16.708 seconds  
@@ -48,23 +48,20 @@ This pair has a high PMI relative to other pairs because the probability of thes
 
  **Question 6.** _(6 points) What are the three words that have the highest PMI with "tears" and "death"? And what are the PMI values?_  
  Highest PMI with "tears":  
-(tears, shed)	2.111790076876236
-(tears, salt)	2.0528122169168985
+(tears, shed)	2.111790076876236  
+(tears, salt)	2.0528122169168985  
 (tears, eyes)	1.1651669643071034  
 
-Highest PMI with "death":
-(death, father's)	1.1202520304197314
-(death, die)	0.7541593889996885
+Highest PMI with "death":  
+(death, father's)	1.1202520304197314  
+(death, die)	0.7541593889996885  
 (death, life)	0.7381345918721788  
 
-**Question 7.** _(6 points) In the Wikipedia sample, what are the three words that have the highest PMI with "waterloo" and "toronto"? And what are the PMI values?_
-
-** TODO ** rerun these to verify.
-
+**Question 7.** _(6 points) In the Wikipedia sample, what are the three words that have the highest PMI with "waterloo" and "toronto"? And what are the PMI values?_  
 Three largets PMI values with "toronto":  
-(toronto, mimico)       1.6847684214104595  
-(toronto, argonauts)    1.5844654655050636  
-(toronto, marlboros)    1.5708250691036227  
+(toronto, mimico)       1.6847684214104595
+(toronto, marlboros)    1.6122177542618477
+(toronto, argonauts)    1.5844654655050636
   
 Three largest PMI values with "waterloo":  
 (waterloo, kitchener)   1.6725974629805342  

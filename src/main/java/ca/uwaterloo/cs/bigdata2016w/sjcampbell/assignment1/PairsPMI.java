@@ -107,7 +107,7 @@ public class PairsPMI extends Configured implements Tool {
 			
 			lineCount = conf.getInt(PmiConfiguration.LineCountProperty, -1);
 			URI[] fileUris = context.getCacheFiles();
-			PmiConfiguration pmiConfig = new PmiConfiguration(StripesPMI.class, conf);
+			PmiConfiguration pmiConfig = new PmiConfiguration(PairsPMI.class, conf);
 			wordCounts = pmiConfig.GetDistributedCacheMap(fileUris); 
 		}
 		
