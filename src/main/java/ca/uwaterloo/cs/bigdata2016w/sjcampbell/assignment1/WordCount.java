@@ -48,7 +48,6 @@ public class WordCount {
 		@Override
 		public void map(LongWritable key, Text value, Context context) 
 				throws IOException, InterruptedException {
-			context.getCounter(Count.LINES).increment(1);
 			String line = ((Text)value).toString();
 			StringTokenizer itr = new StringTokenizer(line);
 			Set<String> set = Sets.newHashSet();
@@ -60,6 +59,8 @@ public class WordCount {
 			}
 			
 			if (set.size() == 0) return;
+			
+			context.getCounter(Count.LINES).increment(1);
 			
 			for(String s : set) {
 				WORD.set(s);
