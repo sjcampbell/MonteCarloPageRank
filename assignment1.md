@@ -7,8 +7,7 @@ Assignment 1
 
 *Stripes:* - The stripes solution also uses two mapreduce jobs. The first is exactly the same as the one used in the pairs approach to calculate word counts and the total number of lines. The second mapreduce job is used to calculate PMI. The mapper receives a line of text and outputs a word as a key, and a map as a value, where the map contains all the other unique words found in the input line. Combiners are used to sum up the maps for a word using a vector-like addition. The reducer is given a word with its corresponding map. It calculates PMI values for all the pairs made from combining the word with the map keys. Then it outputs each pair individually with the corresponding PMI calculation.
 
-**Question 2.** _What is the running time of the complete pairs implementation? What is the running time of the complete stripes implementation? (Tell me where you ran these experiments, e.g., linux.student.cs.uwaterloo.ca or your own laptop.)_
-
+**Question 2.** _What is the running time of the complete pairs implementation? What is the running time of the complete stripes implementation? (Tell me where you ran these experiments, e.g., linux.student.cs.uwaterloo.ca or your own laptop.)_  
 I ran these experiments on my own desktop, with these specifications:
 OS: Ubuntu 14.04
 RAM: 8GB DDR3 1333MHz
@@ -48,25 +47,24 @@ This pair has a high PMI relative to other pairs because the probability of thes
 
  **Question 6.** _(6 points) What are the three words that have the highest PMI with "tears" and "death"? And what are the PMI values?_  
  Highest PMI with "tears":  
-(tears, shed)	2.111790076876236  
-(tears, salt)	2.0528122169168985  
-(tears, eyes)	1.1651669643071034  
+(tears, shed)	2.075765364455672  
+(tears, salt)	2.016787504496334  
+(tears, eyes)	1.1291422518865388  
 
 Highest PMI with "death":  
-(death, father's)	1.1202520304197314  
-(death, die)	0.7541593889996885  
-(death, life)	0.7381345918721788  
+(death, father's)	1.0842273179991668  
+(death, die)	0.718134676579124  
+(death, life)	0.7021098794516143  
+  
 
 **Question 7.** _(6 points) In the Wikipedia sample, what are the three words that have the highest PMI with "waterloo" and "toronto"? And what are the PMI values?_  
 Three largets PMI values with "toronto":  
-(toronto, mimico)       1.6847684214104595
-(toronto, marlboros)    1.6122177542618477
-(toronto, argonauts)    1.5844654655050636
-  
+(toronto, mimico)       1.6847676595578132  
+(toronto, marlboros)    1.6122169924092016  
+(toronto, argonauts)    1.5844647036524175  
+    
 Three largest PMI values with "waterloo":  
-(waterloo, kitchener)   1.6725974629805342  
-(waterloo, napoleonic)  0.7998774154037366  
-(waterloo, napoleon)    0.7889055071141662  
-
-
+(waterloo, kitchener)   1.672596701127888  
+(waterloo, napoleonic)  0.7998766535510904  
+(waterloo, napoleon)    0.78890474526152  
 
