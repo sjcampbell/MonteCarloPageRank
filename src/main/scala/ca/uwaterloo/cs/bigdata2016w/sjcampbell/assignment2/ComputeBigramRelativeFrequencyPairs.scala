@@ -9,14 +9,6 @@ import org.apache.spark.SparkConf
 import org.apache.spark.Partitioner
 import org.rogach.scallop._
 
-class Conf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
-  mainOptions = Seq(input, output, reducers)
-  val input = opt[String](descr = "input path", required = true)
-  val output = opt[String](descr = "output path", required = true)
-  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
-  val imc = opt[Boolean](descr = "use in-mapper combining", required = false)
-}
-
 object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
   val log = Logger.getLogger(getClass().getName())
 
@@ -30,6 +22,24 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
     }
   }
   
+  def partitionMapper(pairCounts : Iterator[((String, String), Int)]) : Iterator[((String, String), Float)] = {
+    var sum = 0F
+    var res = List[((String, String), Int)]()
+    
+    // Could this use a map?
+    pairCounts.map(pairCount => {
+      if (pairCount._1.asInstanceOf[(String, String)]._2 == "*"){
+        sum = pairCount._2
+        (pairCount._1, sum)
+      }
+      else {
+        if (sum == 0) { println("ERROR: Divide by zero imminent!") }
+        
+        (pairCount._1, pairCount._2 / sum)
+      }
+    })
+  }
+  
   def main(argv: Array[String]) {
     val args = new Conf(argv)
 
@@ -39,30 +49,12 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
 
     val conf = new SparkConf().setAppName("Bigram Relative Frequency - Pairs")
     val sc = new SparkContext(conf)
+    sc.setJobDescription("Computing bigram relative frequency using pairs")
 
     val outputDir = new Path(args.output())
     FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
 
     val textFile = sc.textFile(args.input())
-
-    def partitionMapper(pairCounts : Iterator[((String, String), Int)]) : Iterator[((String, String), Float)] = {
-      var sum = 0F
-      var res = List[((String, String), Int)]()
-      
-      // Could this use a map?
-      pairCounts.map(pairCount => {
-        if (pairCount._1.asInstanceOf[(String, String)]._2 == "*"){
-          sum = pairCount._2
-          (pairCount._1, sum)
-        }
-        else {
-          if (sum == 0) { println("ERROR: Divide by zero imminent!") }
-          
-          (pairCount._1, pairCount._2 / sum)
-        }
-      })
-    }
-    
     textFile.flatMap (line => {
       val tokens = tokenize(line)
       if (tokens.length > 1) {
