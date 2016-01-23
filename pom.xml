@@ -136,7 +136,6 @@
       <artifactId>lintools-datatypes</artifactId>
       <version>1.0.0</version>
     </dependency>
-
     <dependency>
       <groupId>net.sf.jung</groupId>
       <artifactId>jung-api</artifactId>
