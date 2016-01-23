@@ -20,43 +20,7 @@ class Conf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
 object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
   val log = Logger.getLogger(getClass().getName())
 
-  def bigramCountIter(lines: Iterator[String]) : Iterator[((String, String), Int)] = {
-      var res = List[((String, String), Int)]()
-      
-      for (line <- lines) {
-        val tokens = tokenize(line)
-        
-        if (tokens.length > 1) {
-          val window = tokens.sliding(2)  // Iterator[List[String]]
-          for (words <- window) {
-            res :+ ((words(0), words(1), 1))
-            res :+ ((words(0), "*", 1))
-          }
-        }
-      }
-          
-      res.iterator
-    }
-  
-  def bigramIter(lines: Iterator[String]) : Iterator[(String, String)] = {
-      var res = List[(String, String)]()
-      
-      for (line <- lines) {
-        val tokens = tokenize(line)
-        
-        if (tokens.length > 1) {
-          val window = tokens.sliding(2)  // Iterator[List[String]]
-          for (words <- window) {
-            res :+ (words(0), words(1))
-            res :+ (words(0), "*")
-          }
-        }
-      }
-          
-      res.iterator
-    }
-
-  // Partition based on first word in key of form (String, String) 
+  // Partition based on first word in key of (String, String) 
   class FirstWordPartitioner(numParts: Int) extends Partitioner {
     def numPartitions: Int = numParts
 
@@ -80,34 +44,24 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
     FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
 
     val textFile = sc.textFile(args.input())
-/*
-    // Approach 0
-    // ==========
-    
-    var sum = 0;
-    textFile.flatMap (line => {
-      val tokens = tokenize(line)
-      if (tokens.length > 1) tokens.sliding(2).map(p => ((p(0), p(1)), 1)).toList else List()
-    })
-    
-    // Returns: RDD[(String, String), Int]  Next: Combine/reduce
-    .reduceByKey(new FirstWordPartitioner(args.reducers()), _ + _)
 
-    // Returns: RDD[(String, String), Int]  Next: Map to calculate for each pair
-    .map((pairCount) => {
-      if (pairCount._1.asInstanceOf[(String,String)]._2 == "*") {
-        sum = pairCount._2
-      }
-      else {
-        (pairCount._1, pairCount._2 / sum)  
-      }
-    })
-    .saveAsTextFile(args.output())
-    
-    println("!!! Job Completed !!!")*/
-
-    // Approach 1
-    // ==========
+    def partitionMapper(pairCounts : Iterator[((String, String), Int)]) : Iterator[((String, String), Float)] = {
+      var sum = 0F
+      var res = List[((String, String), Int)]()
+      
+      // Could this use a map?
+      pairCounts.map(pairCount => {
+        if (pairCount._1.asInstanceOf[(String, String)]._2 == "*"){
+          sum = pairCount._2
+          (pairCount._1, sum)
+        }
+        else {
+          if (sum == 0) { println("ERROR: Divide by zero imminent!") }
+          
+          (pairCount._1, pairCount._2 / sum)
+        }
+      })
+    }
     
     textFile.flatMap (line => {
       val tokens = tokenize(line)
@@ -117,51 +71,19 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
       else List()
     })
     
-    // Returns: RDD[(String, String), Int]  Next: Combine/reduce
+    // RDD[(String, String), Int]  Next: Combine
+    // TODO: Should this be done inside a mapPartitions block to use it as a combiner?
     .reduceByKey(new FirstWordPartitioner(args.reducers()), _ + _)
     
-    // TODO: Is this needed?
+    // RDD[(String, String), Int] Next: Shuffle/sort
     .repartitionAndSortWithinPartitions(new FirstWordPartitioner(args.reducers()))
-    // Returns: RDD[(String, String), Int]  Next: Map to calculate for each pair
-    .mapPartitions(pairCounts => {
-        // On a partition that now has grouped keys...
-      var sum = 0;
-      var res = List[((String, String), Int)]()
-      
-      var count = 0;
-      
-      for (pairCount <- pairCounts) {
-        
-        count += 1
-        
-        if (pairCount._1.asInstanceOf[(String, String)]._2 == "*"){
-          sum = pairCount._2 
-        }
-        else {
-          if (sum == 0) println("WARNING: Sum was ZERO when attempting to calculate relative frequency.")
-          // If sum==0, make sure things are grouped and ordered properly.
-            
-          count = pairCount._2
-          res.:: (pairCount._1, count / sum)
-        }
-      }
-      
-      println("Iterated through all pairCounts. There were " + count);
-      
-      res.iterator
-    })
-    /* TODO: Not used
-    .map((pairCount) => {
-      if (pairCount._1.asInstanceOf[(String,String)]._2 == "*") {
-        sum = pairCount._2
-      }
-      else {
-        (pairCount._1, pairCount._2 / sum)  
-      }
-    })*/
+
+    // RDD[(String, String, Int] Next: Calculate relative frequency 
+    .mapPartitions(partitionMapper, true) 
+
+    // Returns RDD[((String, String), Double)]
     .saveAsTextFile(args.output())
     
     println("!!! Job Completed !!!")
-
   }
 }
