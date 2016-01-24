@@ -48,7 +48,7 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
       val word1 = line._1
       var wordMap = line._2
       val word1Count = wordMap.foldLeft(0)(_+_._2)
-      wordMap.map((w2Item) => ((word1, w2Item._1), (w2Item._2.toFloat/word1Count.toFloat), w2Item._2, word1Count))
+      wordMap.map((w2Item) => ((word1, w2Item._1), w2Item._2.toFloat/word1Count.toFloat))
     })
     // RDD[((String, String), Double)]
     .saveAsTextFile(args.output())
