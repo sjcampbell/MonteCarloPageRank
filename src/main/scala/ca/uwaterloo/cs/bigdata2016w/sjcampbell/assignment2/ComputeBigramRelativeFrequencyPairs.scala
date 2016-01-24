@@ -58,13 +58,16 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
     textFile.flatMap (line => {
       val tokens = tokenize(line)
       if (tokens.length > 1) {
-        tokens.sliding(2).flatMap(p => List(((p(0), p(1)), 1), ((p(0), "*"), 1))) 
+        tokens.sliding(2).flatMap(p => 
+          List(
+                ((p(0), "*"), 1),
+                ((p(0), p(1)), 1)
+              )
+          )
       }
       else List()
     })
-    
     // RDD[(String, String), Int]  Next: Combine
-    // TODO: Should this be done inside a mapPartitions block to use it as a combiner?
     .reduceByKey(new FirstWordPartitioner(args.reducers()), _ + _)
     
     // RDD[(String, String), Int] Next: Shuffle/sort
