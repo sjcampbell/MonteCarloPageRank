@@ -25,5 +25,4 @@ public class PairsPMITest {
 
 		pairsMapper.map(key, value, _pairsContext);
 	}
-
 }

@@ -3,6 +3,8 @@ package ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.Stack;
 import java.util.TreeSet;
@@ -10,8 +12,10 @@ import java.util.TreeSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.Text;
@@ -27,16 +31,32 @@ import tl.lin.data.pair.PairOfInts;
 import tl.lin.data.pair.PairOfWritables;
 
 public class BooleanRetrievalCompressed extends Configured implements Tool {
-  private MapFile.Reader index;
+  private List<MapFile.Reader> indexReaders;
   private FSDataInputStream collection;
   private Stack<Set<Integer>> stack;
 
   private BooleanRetrievalCompressed() {}
 
   private void initialize(String indexPath, String collectionPath, FileSystem fs) throws IOException {
-    index = new MapFile.Reader(new Path(indexPath + "/part-r-00000"), fs.getConf());
+	initializeReader(indexPath, fs);
     collection = fs.open(new Path(collectionPath));
     stack = new Stack<Set<Integer>>();
+  }
+  
+  private void initializeReader(String indexPath, FileSystem fs) throws IOException {
+	  FileStatus[] fileList = fs.listStatus(new Path(indexPath), 
+			  new PathFilter(){
+		  		@Override public boolean accept(Path path){
+		  			return path.getName().startsWith("part-");
+			  } 
+	  });
+		
+	  indexReaders = new ArrayList<MapFile.Reader>();
+	  
+	  for(FileStatus fileStatus : fileList) {
+		  MapFile.Reader reader = new MapFile.Reader(fileStatus.getPath(), fs.getConf());
+		  indexReaders.add(reader);
+	  }  
   }
 
   private void runQuery(String q) throws IOException {
@@ -112,11 +132,16 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
         new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
 
     key.set(term);
-    index.get(key, value);
-
-    return value.getRightElement();
+    
+    for(MapFile.Reader reader : indexReaders) {
+    	reader.get(key,  value);
+    	if (value != null && value.getRightElement() != null) {
+    		return value.getRightElement();
+    	}
+    }
+    return null;
   }
-
+  
   private String fetchLine(long offset) throws IOException {
     collection.seek(offset);
     BufferedReader reader = new BufferedReader(new InputStreamReader(collection));
