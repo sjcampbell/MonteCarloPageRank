@@ -80,6 +80,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     private String previousTerm;
     private ArrayListWritable<PairOfInts> postings;
     private int docFrequency;
+    private int previousDocId;
     
     @Override
     public void setup(Context context) throws IOException {
@@ -102,6 +103,9 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     		TERM.set(previousTerm);
     		context.write(TERM, new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>(DOCFREQUENCY, postings));
 
+    		// Reset gap compression doc ID, postings list, and document frequency for each new key, 
+    		// so that each key has it's own gap-compressed postings list
+        	previousDocId = 0;
     		postings.clear();
     		docFrequency = 0;
     	}
@@ -110,15 +114,15 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     	
     	Iterator<IntWritable> iter = values.iterator();
     	int count = 0;
-    	
     	while(iter.hasNext()) {
-    		IntWritable i = iter.next();
-    		postings.add(new PairOfInts(key.getRightElement(), i.get()));
-    		
     		count++;
     		if (count > 1) {
-    			throw new InterruptedException("What the hell happened there? There should only be one value passed into the reducer.");
+    			throw new InterruptedException("What happened there? There should only be one value passed into the reducer.");
     		}
+    		
+    		IntWritable termCount = iter.next();
+			postings.add(new PairOfInts(key.getRightElement() - previousDocId, termCount.get()));	
+			previousDocId = key.getRightElement();
     	}
     	
     	previousTerm = key.getLeftElement();

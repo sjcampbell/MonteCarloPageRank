@@ -19,6 +19,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.kohsuke.args4j.CmdLineException;
@@ -119,8 +120,10 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
   private Set<Integer> fetchDocumentSet(String term) throws IOException {
     Set<Integer> set = new TreeSet<Integer>();
 
+    int previousDocId = 0;
     for (PairOfInts pair : fetchPostings(term)) {
-      set.add(pair.getLeftElement());
+    	set.add(pair.getLeftElement() + previousDocId);	// Reverse from gap-compression
+    	previousDocId += pair.getLeftElement();
     }
 
     return set;
@@ -129,7 +132,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
   private ArrayListWritable<PairOfInts> fetchPostings(String term) throws IOException {
     Text key = new Text();
     PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>> value =
-        new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
+          new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
 
     key.set(term);
     
