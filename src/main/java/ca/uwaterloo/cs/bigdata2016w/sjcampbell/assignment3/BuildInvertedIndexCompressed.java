@@ -12,6 +12,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -27,13 +28,10 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
 
-import tl.lin.data.array.ArrayListWritable;
 import tl.lin.data.fd.Object2IntFrequencyDistribution;
 import tl.lin.data.fd.Object2IntFrequencyDistributionEntry;
-import tl.lin.data.pair.PairOfInts;
 import tl.lin.data.pair.PairOfObjectInt;
 import tl.lin.data.pair.PairOfStringInt;
-import tl.lin.data.pair.PairOfWritables;
 
 public class BuildInvertedIndexCompressed extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildInvertedIndexCompressed.class);
@@ -74,18 +72,18 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
   }
 
   private static class MyReducer extends
-      Reducer<PairOfStringInt, IntWritable, Text, PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>> {
-    private final static IntWritable DOCFREQUENCY = new IntWritable();
+      Reducer<PairOfStringInt, IntWritable, Text, DocumentPostings> {
+    private final static VIntWritable DOCFREQUENCY = new VIntWritable();
     private final static Text TERM = new Text();
     private String previousTerm;
-    private ArrayListWritable<PairOfInts> postings;
+    private DocumentPostings docPostings;
     private int docFrequency;
     private int previousDocId;
     
     @Override
     public void setup(Context context) throws IOException {
     	previousTerm = null;
-    	postings = new ArrayListWritable<PairOfInts>();
+    	docPostings = new DocumentPostings();
     	docFrequency = 0;
     }
     
@@ -101,16 +99,15 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     	if (!key.getLeftElement().equals(previousTerm) && previousTerm != null) {
     		DOCFREQUENCY.set(docFrequency);
     		TERM.set(previousTerm);
-    		context.write(TERM, new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>(DOCFREQUENCY, postings));
+    		context.write(TERM, docPostings);
 
     		// Reset gap compression doc ID, postings list, and document frequency for each new key, 
     		// so that each key has it's own gap-compressed postings list
         	previousDocId = 0;
-    		postings.clear();
-    		docFrequency = 0;
+    		docPostings.clear();
     	}
 
-    	docFrequency++;
+    	//docFrequency++;
     	
     	Iterator<IntWritable> iter = values.iterator();
     	int count = 0;
@@ -121,7 +118,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     		}
     		
     		IntWritable termCount = iter.next();
-			postings.add(new PairOfInts(key.getRightElement() - previousDocId, termCount.get()));	
+    		docPostings.addPosting(new PairOfVInts(key.getRightElement() - previousDocId, termCount.get()));
 			previousDocId = key.getRightElement();
     	}
     	
@@ -132,7 +129,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     public void cleanup(Context context) throws IOException, InterruptedException {
     	DOCFREQUENCY.set(docFrequency);
 		TERM.set(previousTerm);
-		context.write(TERM, new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>(DOCFREQUENCY, postings));
+		context.write(TERM, docPostings);
     }
   }
 
@@ -187,7 +184,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     job.setMapOutputKeyClass(PairOfStringInt.class);
     job.setMapOutputValueClass(IntWritable.class);
     job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(PairOfWritables.class);
+    job.setOutputValueClass(DocumentPostings.class);
     job.setOutputFormatClass(MapFileOutputFormat.class);
 
     job.setMapperClass(MyMapper.class);

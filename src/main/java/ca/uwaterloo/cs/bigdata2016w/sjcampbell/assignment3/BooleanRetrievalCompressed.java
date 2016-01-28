@@ -16,20 +16,14 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
-
-import tl.lin.data.array.ArrayListWritable;
-import tl.lin.data.pair.PairOfInts;
-import tl.lin.data.pair.PairOfWritables;
 
 public class BooleanRetrievalCompressed extends Configured implements Tool {
   private List<MapFile.Reader> indexReaders;
@@ -121,7 +115,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     Set<Integer> set = new TreeSet<Integer>();
 
     int previousDocId = 0;
-    for (PairOfInts pair : fetchPostings(term)) {
+    for (PairOfVInts pair : fetchPostings(term)) {
     	set.add(pair.getLeftElement() + previousDocId);	// Reverse from gap-compression
     	previousDocId += pair.getLeftElement();
     }
@@ -129,19 +123,19 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     return set;
   }
 
-  private ArrayListWritable<PairOfInts> fetchPostings(String term) throws IOException {
+  private ArrayList<PairOfVInts> fetchPostings(String term) throws IOException {
     Text key = new Text();
-    PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>> value =
-          new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
 
+    DocumentPostings docPostings = new DocumentPostings();
     key.set(term);
     
-    for(MapFile.Reader reader : indexReaders) {
-    	reader.get(key,  value);
-    	if (value != null && value.getRightElement() != null) {
-    		return value.getRightElement();
+    for (MapFile.Reader reader : indexReaders) {
+    	reader.get(key, docPostings);
+    	if (docPostings != null && docPostings.getPostings() != null) {
+    		return docPostings.getPostings();
     	}
     }
+    
     return null;
   }
   
