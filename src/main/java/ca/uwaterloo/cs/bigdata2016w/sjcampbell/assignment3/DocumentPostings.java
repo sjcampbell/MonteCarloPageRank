@@ -3,26 +3,25 @@ package ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.ArrayList;
 
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
-import tl.lin.data.array.ArrayListWritable;
-
 public class DocumentPostings implements Writable {
 
 	public DocumentPostings() { 
-		postingsList = new ArrayListWritable<PairOfVInts>();
+		postingsList = new ArrayList<PairOfVInts>();
 	}
 	
-	public DocumentPostings(int docFrequency, ArrayListWritable<PairOfVInts> postings) {
+	public DocumentPostings(int docFrequency, ArrayList<PairOfVInts> postings) {
 		documentFrequency = docFrequency;
 		postingsList = postings;
 	}
 	
 	private int documentFrequency;
 	
-	private ArrayListWritable<PairOfVInts> postingsList;	
+	private ArrayList<PairOfVInts> postingsList;	
 	
 	public void addPosting(PairOfVInts posting) {
 		postingsList.add(posting);
@@ -34,8 +33,12 @@ public class DocumentPostings implements Writable {
 		documentFrequency = 0;
 	}
 	
-	public void set(int docFrequenct, ArrayListWritable<PairOfVInts> postings) {
-		documentFrequency = docFrequenct;
+	public boolean hasPostings() {
+		return !postingsList.isEmpty();
+	}
+	
+	public void set(int docFrequency, ArrayList<PairOfVInts> postings) {
+		documentFrequency = docFrequency;
 		postingsList = postings;
 	}
 	
@@ -43,7 +46,7 @@ public class DocumentPostings implements Writable {
 		return documentFrequency;
 	}
 	
-	public ArrayListWritable<PairOfVInts> getPostings() {
+	public ArrayList<PairOfVInts> getPostings() {
 		return postingsList;
 	}
 

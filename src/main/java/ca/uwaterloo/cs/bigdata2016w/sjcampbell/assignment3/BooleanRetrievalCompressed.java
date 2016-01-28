@@ -131,7 +131,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     
     for (MapFile.Reader reader : indexReaders) {
     	reader.get(key, docPostings);
-    	if (docPostings != null && docPostings.getPostings() != null) {
+    	if (docPostings != null && docPostings.hasPostings()) {
     		return docPostings.getPostings();
     	}
     }
