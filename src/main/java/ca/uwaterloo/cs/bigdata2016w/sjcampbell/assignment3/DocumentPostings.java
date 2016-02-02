@@ -48,7 +48,7 @@ public class DocumentPostings implements Writable {
 	}
 	
 	public DocumentPostings AND(DocumentPostings postings) throws IOException {
-		PostingsBuffer intBuffer = postingsBuf.AND2(postings.getBuffer());
+		PostingsBuffer intBuffer = postingsBuf.AND(postings.getBuffer());
 		return new DocumentPostings(intBuffer);
 	}
 	

@@ -61,40 +61,8 @@ public class PostingsBuffer implements DataOutput, DataInput {
 		WritableUtils.writeVInt(this, docId);
 	}
 	
-	// Assumption: postings are already sorted.
-	public PostingsBuffer AND(PostingsBuffer postings) throws IOException {
-		PostingsBuffer newBuf = new PostingsBuffer();  
-		
-		long thisDocId = 0;
-		long thisGap = WritableUtils.readVInt(this);
-		long thatDocId = 0;
-		long thatGap = WritableUtils.readVInt(postings);
-		
-		while(thisDocId > -1 || thatDocId > -1) {
-			if (thisDocId < 0 || ((thatDocId > -1) && (thatDocId + thatGap) < (thisDocId + thisGap))) {
-				thatGap += thatDocId;
-				thatDocId = WritableUtils.readVLong(postings);
-			}
-			else if (thatDocId < 0 || ((thisDocId > -1) && (thisDocId + thisGap) < (thatDocId + thatGap))) {
-				thisGap += thisDocId;
-				thisDocId = WritableUtils.readVLong(this);				
-			}
-			else {	
-				// doc IDs are equal
-				WritableUtils.writeVLong(newBuf, thisDocId + thisGap);
-				thisGap += thisDocId;
-				thatGap += thatDocId;
-
-				thisDocId = WritableUtils.readVLong(this);
-				thatDocId = WritableUtils.readVLong(postings);
-			}
-		}
-		
-		return newBuf;
-	}
-	
 	// This method assumes postings are already sorted.
-	public PostingsBuffer AND2(PostingsBuffer postings) throws IOException {
+	public PostingsBuffer AND(PostingsBuffer postings) throws IOException {
 		
 		PostingsBuffer newBuf = new PostingsBuffer();
 		
