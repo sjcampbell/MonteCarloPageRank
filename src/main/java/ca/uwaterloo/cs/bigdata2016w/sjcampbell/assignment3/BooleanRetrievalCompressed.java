@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.Stack;
@@ -29,12 +30,14 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
   private List<MapFile.Reader> indexReaders;
   private FSDataInputStream collection;
   private Stack<Set<Integer>> stack;
+  private Stack<DocumentPostings> postingsStack;
 
   private BooleanRetrievalCompressed() {}
 
   private void initialize(String indexPath, String collectionPath, FileSystem fs) throws IOException {
 	initializeReader(indexPath, fs);
     collection = fs.open(new Path(collectionPath));
+    postingsStack = new Stack<DocumentPostings>();
     stack = new Stack<Set<Integer>>();
   }
   
@@ -63,21 +66,26 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
       } else if (t.equals("OR")) {
         performOR();
       } else {
-        pushTerm(t);
+        pushTermPostings(t);
       }
     }
 
-    Set<Integer> set = stack.pop();
-
-    for (Integer i : set) {
-      String line = fetchLine(i);
-      System.out.println(i + "\t" + line);
+    DocumentPostings postings = postingsStack.pop();
+    
+    Iterator<Integer> iter = postings.docIdsIterator(); 
+    while(iter.hasNext()) {
+    	int i = iter.next();
+    	if (i < 0) return;
+    	
+    	String line = fetchLine(i);
+    	System.out.println(i + "\t" + line);
     }
   }
 
-  private void pushTerm(String term) throws IOException {
-    stack.push(fetchDocumentSet(term));
+  private void pushTermPostings(String term) throws IOException {
+	  postingsStack.push(fetchDocPostings(term));
   }
+
 
   private void performAND() {
     Set<Integer> s1 = stack.pop();
@@ -111,32 +119,20 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     stack.push(sn);
   }
 
-  private Set<Integer> fetchDocumentSet(String term) throws IOException {
-    Set<Integer> set = new TreeSet<Integer>();
+  private DocumentPostings fetchDocPostings(String term) throws IOException {
+	  Text key = new Text();
 
-    int previousDocId = 0;
-    for (PairOfVInts pair : fetchPostings(term)) {
-    	set.add(pair.getLeftElement() + previousDocId);	// Reverse from gap-compression
-    	previousDocId += pair.getLeftElement();
-    }
-
-    return set;
-  }
-
-  private ArrayList<PairOfVInts> fetchPostings(String term) throws IOException {
-    Text key = new Text();
-
-    DocumentPostings docPostings = new DocumentPostings();
-    key.set(term);
-    
-    for (MapFile.Reader reader : indexReaders) {
-    	reader.get(key, docPostings);
-    	if (docPostings != null && docPostings.hasPostings()) {
-    		return docPostings.getPostings();
-    	}
-    }
-    
-    return null;
+	    DocumentPostings docPostings = new DocumentPostings();
+	    key.set(term);
+	    
+	    for (MapFile.Reader reader : indexReaders) {
+	    	reader.get(key, docPostings);
+	    	if (docPostings != null && docPostings.hasPostings()) {
+	    		return docPostings;
+	    	}
+	    }
+	    
+	    return null;
   }
   
   private String fetchLine(long offset) throws IOException {

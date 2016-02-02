@@ -17,13 +17,14 @@ Assignment 3
 **422.4 M**	**Total**  
 
 
-**Question 3.** _What are the Wikipedia articles (just the article titles) retrieved in response to the query "waterloo stanford OR cheriton AND"?_
+**Question 3.** _What are the Wikipedia articles (just the article titles) retrieved in response to the query "waterloo stanford OR cheriton AND"?_  
 
 Eurostar  
 Railway platform  
 Andy Bechtolsheim  
 List of civil parishes in Hampshire  
 
-**Question 4.**
+**Question 4.** _What are the Wikipedia articles (just the article titles) retrieved in response to the query "internet startup AND canada AND ontario AND"?_  
 
-TODO:... run this.
+Amazon.com   
+Criticism of Facebook  

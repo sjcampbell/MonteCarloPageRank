@@ -107,8 +107,6 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     		docPostings.clear();
     	}
 
-    	//docFrequency++;
-    	
     	Iterator<IntWritable> iter = values.iterator();
     	int count = 0;
     	while(iter.hasNext()) {

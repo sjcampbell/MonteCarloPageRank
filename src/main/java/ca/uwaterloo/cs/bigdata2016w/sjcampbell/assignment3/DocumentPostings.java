@@ -3,7 +3,7 @@ package ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Iterator;
 
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -11,48 +11,89 @@ import org.apache.hadoop.io.WritableUtils;
 public class DocumentPostings implements Writable {
 
 	public DocumentPostings() { 
-		postingsList = new ArrayList<PairOfVInts>();
+		postingsBuf = new PostingsBuffer();
 	}
 	
-	public DocumentPostings(int docFrequency, ArrayList<PairOfVInts> postings) {
-		documentFrequency = docFrequency;
-		postingsList = postings;
-	}
-	
+	private PostingsBuffer postingsBuf;
+
 	private int documentFrequency;
 	
-	private ArrayList<PairOfVInts> postingsList;	
+	private boolean hasPostings = false;
 	
-	public void addPosting(PairOfVInts posting) {
-		postingsList.add(posting);
+	public void addPosting(PairOfVInts posting) throws IOException {
 		documentFrequency++;
+
+		// Only keep the document ID. Could keep the term count too if needed later by modifying postingsBuffer.
+		postingsBuf.addPosting(posting.getLeftElement());
+		
+		hasPostings = true;
 	}
 	
-	public void clear() {
-		postingsList.clear();
+	public void clear() throws IOException {
+		postingsBuf.resetReadPos();
 		documentFrequency = 0;
 	}
 	
 	public boolean hasPostings() {
-		return !postingsList.isEmpty();
-	}
-	
-	public void set(int docFrequency, ArrayList<PairOfVInts> postings) {
-		documentFrequency = docFrequency;
-		postingsList = postings;
+		return hasPostings;
 	}
 	
 	public int getDocFrequency() {
 		return documentFrequency;
 	}
+
+	public PostingsBuffer getBuffer() {
+		return postingsBuf;
+	}
 	
-	public ArrayList<PairOfVInts> getPostings() {
-		return postingsList;
+	public Iterator<Integer> andDocumentIds(DocumentPostings docPostings) throws IOException {
+		PostingsBuffer intBuffer = postingsBuf.AND(docPostings.getBuffer());
+		return new DocIdIterator(intBuffer);
+	}
+	
+	public Iterator<Integer> orDocumentIds(DocumentPostings docPostings) throws IOException {
+		PostingsBuffer intBuffer = postingsBuf.OR(docPostings.getBuffer());
+		return new DocIdIterator(intBuffer);
+	}
+	
+	public Iterator<Integer> docIdsIterator() {
+		return new DocIdIterator(postingsBuf);
 	}
 
-	@Override
+	public class DocIdIterator implements Iterator<Integer>
+	{
+		private PostingsBuffer buffer;
+		
+		public DocIdIterator(PostingsBuffer buf) {
+			buffer = buf;
+		}
+		
+		@Override
+		public boolean hasNext() {
+			return buffer.canRead();
+		}
+
+		@Override
+		public Integer next() {
+			int docId = -1;
+			try {
+				docId = WritableUtils.readVInt(buffer);
+			} 
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			return docId;
+		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();	// Not needed for this assignment
+		}
+	}
+
 	public void write(DataOutput out) throws IOException {
-		WritableUtils.writeVInt(out, documentFrequency);
+	/*	WritableUtils.writeVInt(out, documentFrequency);
 		
 		int size = postingsList.size();
 		out.writeInt(size);
@@ -67,11 +108,12 @@ public class DocumentPostings implements Writable {
 	    	}
 	    	pair.write(out);
 	    }
+	    */
 	}
 
-	@Override
 	public void readFields(DataInput in) throws IOException {
-		documentFrequency = WritableUtils.readVInt(in);
+		
+		/*documentFrequency = WritableUtils.readVInt(in);
 		
 		postingsList.clear();
 
@@ -90,5 +132,6 @@ public class DocumentPostings implements Writable {
 	    catch (Exception e) {
 	      e.printStackTrace();
 	    }
+	    */
 	}
 }
