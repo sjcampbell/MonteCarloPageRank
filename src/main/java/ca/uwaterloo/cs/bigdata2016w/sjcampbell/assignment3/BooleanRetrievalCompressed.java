@@ -6,9 +6,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.Stack;
-import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -29,7 +27,6 @@ import org.kohsuke.args4j.ParserProperties;
 public class BooleanRetrievalCompressed extends Configured implements Tool {
   private List<MapFile.Reader> indexReaders;
   private FSDataInputStream collection;
-  private Stack<Set<Integer>> stack;
   private Stack<DocumentPostings> postingsStack;
 
   private BooleanRetrievalCompressed() {}
@@ -38,7 +35,6 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 	initializeReader(indexPath, fs);
     collection = fs.open(new Path(collectionPath));
     postingsStack = new Stack<DocumentPostings>();
-    stack = new Stack<Set<Integer>>();
   }
   
   private void initializeReader(String indexPath, FileSystem fs) throws IOException {
@@ -54,7 +50,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 	  for(FileStatus fileStatus : fileList) {
 		  MapFile.Reader reader = new MapFile.Reader(fileStatus.getPath(), fs.getConf());
 		  indexReaders.add(reader);
-	  }  
+	  }
   }
 
   private void runQuery(String q) throws IOException {
@@ -72,11 +68,10 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 
     DocumentPostings postings = postingsStack.pop();
     
-    Iterator<Integer> iter = postings.docIdsIterator(); 
+    Iterator<Integer> iter = postings.docIdsIterator();
     while(iter.hasNext()) {
     	int i = iter.next();
     	if (i < 0) return;
-    	
     	String line = fetchLine(i);
     	System.out.println(i + "\t" + line);
     }
@@ -86,37 +81,20 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 	  postingsStack.push(fetchDocPostings(term));
   }
 
-
-  private void performAND() {
-    Set<Integer> s1 = stack.pop();
-    Set<Integer> s2 = stack.pop();
-
-    Set<Integer> sn = new TreeSet<Integer>();
-
-    for (int n : s1) {
-      if (s2.contains(n)) {
-        sn.add(n);
-      }
-    }
-
-    stack.push(sn);
+  private void performAND() throws IOException {
+	  DocumentPostings p1 = postingsStack.pop();
+	  DocumentPostings p2 = postingsStack.pop();
+	  
+	  DocumentPostings p3 = p1.AND(p2);
+	  postingsStack.push(p3);
   }
 
-  private void performOR() {
-    Set<Integer> s1 = stack.pop();
-    Set<Integer> s2 = stack.pop();
-
-    Set<Integer> sn = new TreeSet<Integer>();
-
-    for (int n : s1) {
-      sn.add(n);
-    }
-
-    for (int n : s2) {
-      sn.add(n);
-    }
-
-    stack.push(sn);
+  private void performOR() throws IOException {
+	  DocumentPostings p1 = postingsStack.pop();
+	  DocumentPostings p2 = postingsStack.pop();
+	  
+	  DocumentPostings p3 = p1.OR(p2);
+	  postingsStack.push(p3);
   }
 
   private DocumentPostings fetchDocPostings(String term) throws IOException {

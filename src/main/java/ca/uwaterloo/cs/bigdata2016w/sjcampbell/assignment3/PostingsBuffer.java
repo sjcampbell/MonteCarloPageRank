@@ -65,71 +65,120 @@ public class PostingsBuffer implements DataOutput, DataInput {
 	public PostingsBuffer AND(PostingsBuffer postings) throws IOException {
 		PostingsBuffer newBuf = new PostingsBuffer();  
 		
-		int thisDocId = 0;
-		int thisGap = WritableUtils.readVInt(this);
-		int thatDocId = 0;
-		int thatGap = WritableUtils.readVInt(postings);
+		long thisDocId = 0;
+		long thisGap = WritableUtils.readVInt(this);
+		long thatDocId = 0;
+		long thatGap = WritableUtils.readVInt(postings);
 		
 		while(thisDocId > -1 || thatDocId > -1) {
-			if (thisDocId < 0 || (thatDocId > -1) && (thatDocId + thatGap) < (thisDocId + thisGap)) {
+			if (thisDocId < 0 || ((thatDocId > -1) && (thatDocId + thatGap) < (thisDocId + thisGap))) {
 				thatGap += thatDocId;
-				thatDocId = WritableUtils.readVInt(postings);
+				thatDocId = WritableUtils.readVLong(postings);
 			}
-			else if (thatDocId < 0 || (thisDocId > -1) && (thisDocId + thisGap) < (thatDocId + thatGap)) {
+			else if (thatDocId < 0 || ((thisDocId > -1) && (thisDocId + thisGap) < (thatDocId + thatGap))) {
 				thisGap += thisDocId;
-				thisDocId = WritableUtils.readVInt(this);				
+				thisDocId = WritableUtils.readVLong(this);				
 			}
 			else {	
 				// doc IDs are equal
-				WritableUtils.writeVInt(newBuf, thisDocId + thisGap);
+				WritableUtils.writeVLong(newBuf, thisDocId + thisGap);
 				thisGap += thisDocId;
 				thatGap += thatDocId;
 
-				thisDocId = WritableUtils.readVInt(this);
-				thatDocId = WritableUtils.readVInt(postings);
-			}
-		}
-		
-		return newBuf;
-	}
-
-	// Assumption: postings are already sorted.
-	public PostingsBuffer OR(PostingsBuffer postings) throws IOException {
-		
-		PostingsBuffer newBuf = new PostingsBuffer();
-		
-		int thisDocId = 0;
-		int thisGap = WritableUtils.readVInt(this);
-		int thatDocId = 0;
-		int thatGap = WritableUtils.readVInt(postings);
-		
-		while(thisDocId > -1 || thatDocId > -1) {
-			if (thisDocId < 0 || (thatDocId + thatGap) < (thisDocId + thisGap)) {
-				WritableUtils.writeVInt(newBuf, thatDocId + thatGap);
-				thatGap += thatDocId;
-				thatDocId = WritableUtils.readVInt(this);
-			}
-			else if (thatDocId < 0 || (thisDocId + thisGap) < (thatDocId + thatGap)) {
-				WritableUtils.writeVInt(newBuf, thisDocId + thisGap);
-				thisGap += thisDocId;
-				thisDocId = WritableUtils.readVInt(this);				
-			}
-			else {	
-				// doc IDs are equal
-				WritableUtils.writeVInt(newBuf, thisDocId + thisGap);
-				thisGap += thisDocId;
-
-				thisDocId = WritableUtils.readVInt(this);
-				thatDocId = WritableUtils.readVInt(postings);
+				thisDocId = WritableUtils.readVLong(this);
+				thatDocId = WritableUtils.readVLong(postings);
 			}
 		}
 		
 		return newBuf;
 	}
 	
+	// This method assumes postings are already sorted.
+	public PostingsBuffer AND2(PostingsBuffer postings) throws IOException {
+		
+		PostingsBuffer newBuf = new PostingsBuffer();
+		
+		long thisGap = WritableUtils.readVLong(this);
+		long thatGap = WritableUtils.readVLong(postings);
+		long runningGap = Math.min(thisGap, thatGap);
+		long gapSum = runningGap;
+		
+		while(thisGap > -1 || thatGap > -1) {
+			if (thisGap == thatGap) {
+				WritableUtils.writeVLong(newBuf, gapSum);
+				thisGap = WritableUtils.readVLong(this);
+				thatGap = WritableUtils.readVLong(postings);
+				gapSum = 0;
+			}
+			else if (runningGap == thisGap) {
+				thisGap = WritableUtils.readVLong(this);
+				thatGap -= runningGap;
+			}
+			else if (runningGap == thatGap) {
+				thatGap = WritableUtils.readVLong(postings);
+				thisGap -= runningGap;
+			}
+			
+			if (thisGap < 0) {
+				runningGap = thatGap;
+			}
+			else if (thatGap < 0) {
+				runningGap = thisGap;
+			}
+			else {
+				runningGap = (thisGap <= thatGap) ? thisGap : thatGap;
+			}
+			
+			gapSum += runningGap;
+		}
+		
+		return newBuf;
+	}
+	
+	// This method assumes postings are already sorted.
+	public PostingsBuffer OR(PostingsBuffer postings) throws IOException {
+		
+		PostingsBuffer newBuf = new PostingsBuffer();
+		
+		long thisGap = WritableUtils.readVLong(this);
+		long thatGap = WritableUtils.readVLong(postings);
+		long runningGap = Math.min(thisGap, thatGap);
+		
+		while(thisGap > -1 || thatGap > -1) {
+
+			if (thisGap == thatGap) {
+				WritableUtils.writeVLong(newBuf, thisGap);
+				thisGap = WritableUtils.readVLong(this);
+				thatGap = WritableUtils.readVLong(postings);
+			}
+			else if (runningGap == thisGap) {
+				WritableUtils.writeVLong(newBuf, thisGap);
+				thisGap = WritableUtils.readVLong(this);
+				thatGap -= runningGap;
+			}
+			else if (runningGap == thatGap) {
+				WritableUtils.writeVLong(newBuf, thatGap);
+				thatGap = WritableUtils.readVLong(postings);
+				thisGap -= runningGap;
+			}
+			
+			if (thisGap < 0) {
+				runningGap = thatGap;
+			}
+			else if (thatGap < 0) {
+				runningGap = thisGap;
+			}
+			else {
+				runningGap = (thisGap <= thatGap) ? thisGap : thatGap;
+			}
+		}
+		
+		return newBuf;
+	}
+
 	//
-	// Assignment hack... Ignore methods below.
-	// ========================================
+	// Ignore methods below unless they become useful.
+	// ===============================================
 
 	@Override
 	public void write(int b) throws IOException {

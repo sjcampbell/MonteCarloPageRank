@@ -12,7 +12,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -73,18 +72,16 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
 
   private static class MyReducer extends
       Reducer<PairOfStringInt, IntWritable, Text, DocumentPostings> {
-    private final static VIntWritable DOCFREQUENCY = new VIntWritable();
     private final static Text TERM = new Text();
     private String previousTerm;
     private DocumentPostings docPostings;
-    private int docFrequency;
     private int previousDocId;
     
     @Override
     public void setup(Context context) throws IOException {
     	previousTerm = null;
     	docPostings = new DocumentPostings();
-    	docFrequency = 0;
+    	previousDocId = 0;
     }
     
 	/*	Reducer
@@ -97,10 +94,9 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
         throws IOException, InterruptedException {
     	
     	if (!key.getLeftElement().equals(previousTerm) && previousTerm != null) {
-    		DOCFREQUENCY.set(docFrequency);
     		TERM.set(previousTerm);
     		context.write(TERM, docPostings);
-
+    		
     		// Reset gap compression doc ID, postings list, and document frequency for each new key, 
     		// so that each key has it's own gap-compressed postings list
         	previousDocId = 0;
@@ -125,9 +121,11 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException {
-    	DOCFREQUENCY.set(docFrequency);
-		TERM.set(previousTerm);
-		context.write(TERM, docPostings);
+    	if (previousTerm != null)
+    	{
+    		TERM.set(previousTerm);
+			context.write(TERM, docPostings);
+    	}
     }
   }
 
