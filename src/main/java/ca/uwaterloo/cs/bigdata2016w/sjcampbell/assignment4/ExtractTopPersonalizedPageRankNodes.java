@@ -1,6 +1,9 @@
 package ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment4;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Iterator;
 
@@ -13,6 +16,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FloatWritable;
@@ -104,6 +108,7 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
   private static final String INPUT = "input";
   private static final String OUTPUT = "output";
   private static final String TOP = "top";
+  private static final String SOURCES = "sources";
 
   /**
    * Runs this tool.
@@ -112,12 +117,10 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
   public int run(String[] args) throws Exception {
     Options options = new Options();
 
-    options.addOption(OptionBuilder.withArgName("path").hasArg()
-        .withDescription("input path").create(INPUT));
-    options.addOption(OptionBuilder.withArgName("path").hasArg()
-        .withDescription("output path").create(OUTPUT));
-    options.addOption(OptionBuilder.withArgName("num").hasArg()
-        .withDescription("top n").create(TOP));
+    options.addOption(OptionBuilder.withArgName("path").hasArg().withDescription("input path").create(INPUT));
+    options.addOption(OptionBuilder.withArgName("path").hasArg().withDescription("output path").create(OUTPUT));
+    options.addOption(OptionBuilder.withArgName("num").hasArg().withDescription("top n").create(TOP));
+    options.addOption(OptionBuilder.withArgName("num").hasArg().withDescription("sources").create(SOURCES));
 
     CommandLine cmdline;
     CommandLineParser parser = new GnuParser();
@@ -129,7 +132,7 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
       return -1;
     }
 
-    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(TOP)) {
+    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(TOP) || !cmdline.hasOption(SOURCES)) {
       System.out.println("args: " + Arrays.toString(args));
       HelpFormatter formatter = new HelpFormatter();
       formatter.setWidth(120);
@@ -141,6 +144,7 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
     String inputPath = cmdline.getOptionValue(INPUT);
     String outputPath = cmdline.getOptionValue(OUTPUT);
     int n = Integer.parseInt(cmdline.getOptionValue(TOP));
+    String sources = cmdline.getOptionValue(SOURCES);
 
     LOG.info("Tool name: " + ExtractTopPersonalizedPageRankNodes.class.getSimpleName());
     LOG.info(" - input: " + inputPath);
@@ -176,6 +180,8 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
     FileSystem.get(conf).delete(new Path(outputPath), true);
 
     job.waitForCompletion(true);
+    
+    printPageRanks(job.getConfiguration(), outputPath, parseSourceString(sources));
 
     return 0;
   }
@@ -186,5 +192,36 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
   public static void main(String[] args) throws Exception {
     int res = ToolRunner.run(new ExtractTopPersonalizedPageRankNodes(), args);
     System.exit(res);
+  }
+  
+  private void printPageRanks(Configuration conf, String inputPath, int[] sources) throws URISyntaxException, IOException {
+	  // SSPR: only print first source as a start.
+
+	  Path filePath = new Path(inputPath + "/part-r-00000");
+	  FileSystem fs = FileSystem.get(conf);
+	  FSDataInputStream in = fs.open(filePath);
+	  BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+	  
+	  try {
+		  String line;
+		  while((line = reader.readLine()) != null) {
+			  String[] nodeIdPageRank = line.split("\t");
+			  int nodeId = Integer.parseInt(nodeIdPageRank[0]);
+			  float pageRank = Float.parseFloat(nodeIdPageRank[1]);
+			  System.out.println(String.format("%.5f %d", StrictMath.exp(pageRank), nodeId));
+		  }
+	  }
+	  finally {
+		  reader.close();
+	  }
+  }
+  
+  private int[] parseSourceString(String sourceStr) {
+	  String[] sourceStrs = sourceStr.trim().split(",");
+	  int[] sourceNums = new int[sourceStrs.length];
+	  for (int i = 0; i < sourceStrs.length; i++) {
+		  sourceNums[i] = Integer.parseInt(sourceStrs[i]);
+	  }
+	  return sourceNums;
   }
 }

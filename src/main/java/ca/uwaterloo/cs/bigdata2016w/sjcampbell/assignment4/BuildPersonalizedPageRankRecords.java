@@ -34,9 +34,6 @@ import tl.lin.data.array.ArrayListOfIntsWritable;
  * Driver program that takes a plain-text encoding of a directed graph and builds corresponding
  * Hadoop structures for representing the graph.
  * </p>
- *
- * @author Jimmy Lin
- * @author Michael Schatz
  */
 public class BuildPersonalizedPageRankRecords extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildPersonalizedPageRankRecords.class);
@@ -46,46 +43,62 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
   private static class MyMapper extends Mapper<LongWritable, Text, IntWritable, PageRankNode> {
     private static final IntWritable nid = new IntWritable();
     private static final PageRankNode node = new PageRankNode();
-
+    private static int[] sources;
+    
     @Override
     public void setup(Mapper<LongWritable, Text, IntWritable, PageRankNode>.Context context) {
-      int n = context.getConfiguration().getInt(NODE_CNT_FIELD, 0);
-      if (n == 0) {
-        throw new RuntimeException(NODE_CNT_FIELD + " cannot be 0!");
-      }
-      node.setType(PageRankNode.Type.Complete);
-      node.setPageRank((float) -StrictMath.log(n));
+		sources = context.getConfiguration().getInts("Sources");
+		if (sources == null || sources.length == 0)
+		{
+			throw new RuntimeException("Sources configuration was not found in the personalized PageRank records builder mapper.");
+		}
+    	
+    	int n = context.getConfiguration().getInt(NODE_CNT_FIELD, 0);
+    	if (n == 0) {
+    		throw new RuntimeException(NODE_CNT_FIELD + " cannot be 0!");
+    	}
+    	node.setType(PageRankNode.Type.Complete);
+    	
+    	// SSPR: All nodes except the source node(s) get a 0 ranking to start.
+    	node.setPageRank(Float.NEGATIVE_INFINITY);	
+    	//node.setPageRank((float) -StrictMath.log(n));
     }
 
     @Override
-    public void map(LongWritable key, Text t, Context context) throws IOException,
-        InterruptedException {
-      String[] arr = t.toString().trim().split("\\s+");
+    public void map(LongWritable key, Text t, Context context) throws IOException, InterruptedException {
+    	String[] arr = t.toString().trim().split("\\s+");
 
-      nid.set(Integer.parseInt(arr[0]));
-      if (arr.length == 1) {
-        node.setNodeId(Integer.parseInt(arr[0]));
-        node.setAdjacencyList(new ArrayListOfIntsWritable());
+    	nid.set(Integer.parseInt(arr[0]));
+    	node.setNodeId(Integer.parseInt(arr[0]));
+    	
+    	// SSPR: Use only the first node for personalized single source PR
+    	if (nid.equals(new IntWritable(sources[0]))) {
+    		node.setPageRank((float)StrictMath.log(1.0f));
+    	}
+    	else {
+    		node.setPageRank(Float.NEGATIVE_INFINITY);
+    	}
 
-      } else {
-        node.setNodeId(Integer.parseInt(arr[0]));
+    	if (arr.length == 1) {
+    		node.setAdjacencyList(new ArrayListOfIntsWritable());
+    	} 
+    	else {
+    		int[] neighbors = new int[arr.length - 1];
+    		for (int i = 1; i < arr.length; i++) {
+    			neighbors[i - 1] = Integer.parseInt(arr[i]);
+    		}
 
-        int[] neighbors = new int[arr.length - 1];
-        for (int i = 1; i < arr.length; i++) {
-          neighbors[i - 1] = Integer.parseInt(arr[i]);
-        }
+    		node.setAdjacencyList(new ArrayListOfIntsWritable(neighbors));
+    	}
 
-        node.setAdjacencyList(new ArrayListOfIntsWritable(neighbors));
-      }
+    	context.getCounter("graph", "numNodes").increment(1);
+    	context.getCounter("graph", "numEdges").increment(arr.length - 1);
 
-      context.getCounter("graph", "numNodes").increment(1);
-      context.getCounter("graph", "numEdges").increment(arr.length - 1);
+    	if (arr.length > 1) {
+    		context.getCounter("graph", "numActiveNodes").increment(1);
+    	}
 
-      if (arr.length > 1) {
-        context.getCounter("graph", "numActiveNodes").increment(1);
-      }
-
-      context.write(nid, node);
+    	context.write(nid, node);
     }
   }
 
@@ -94,6 +107,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
   private static final String INPUT = "input";
   private static final String OUTPUT = "output";
   private static final String NUM_NODES = "numNodes";
+  private static final String SOURCES = "sources";
 
   /**
    * Runs this tool.
@@ -108,6 +122,8 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
         .withDescription("output path").create(OUTPUT));
     options.addOption(OptionBuilder.withArgName("num").hasArg()
         .withDescription("number of nodes").create(NUM_NODES));
+    options.addOption(OptionBuilder.withArgName("num").hasArg()
+        .withDescription("sources").create(SOURCES));
 
     CommandLine cmdline;
     CommandLineParser parser = new GnuParser();
@@ -119,7 +135,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
       return -1;
     }
 
-    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(NUM_NODES)) {
+    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(NUM_NODES) || !cmdline.hasOption(SOURCES)) {
       System.out.println("args: " + Arrays.toString(args));
       HelpFormatter formatter = new HelpFormatter();
       formatter.setWidth(120);
@@ -131,11 +147,13 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     String inputPath = cmdline.getOptionValue(INPUT);
     String outputPath = cmdline.getOptionValue(OUTPUT);
     int n = Integer.parseInt(cmdline.getOptionValue(NUM_NODES));
+    String sources = cmdline.getOptionValue(SOURCES);
 
     LOG.info("Tool name: " + BuildPersonalizedPageRankRecords.class.getSimpleName());
     LOG.info(" - inputDir: " + inputPath);
     LOG.info(" - outputDir: " + outputPath);
     LOG.info(" - numNodes: " + n);
+    LOG.info(" - sources: " + n);
 
     Configuration conf = getConf();
     conf.setInt(NODE_CNT_FIELD, n);
@@ -146,6 +164,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     job.setJarByClass(BuildPersonalizedPageRankRecords.class);
 
     job.setNumReduceTasks(0);
+    job.getConfiguration().set("Sources", sources);
 
     FileInputFormat.addInputPath(job, new Path(inputPath));
     FileOutputFormat.setOutputPath(job, new Path(outputPath));
