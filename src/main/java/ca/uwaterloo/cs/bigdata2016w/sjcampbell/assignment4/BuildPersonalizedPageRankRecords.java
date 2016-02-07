@@ -61,7 +61,6 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     	
     	// SSPR: All nodes except the source node(s) get a 0 ranking to start.
     	node.setPageRank(Float.NEGATIVE_INFINITY);	
-    	//node.setPageRank((float) -StrictMath.log(n));
     }
 
     @Override
@@ -73,7 +72,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     	
     	// SSPR: Use only the first node for personalized single source PR
     	if (nid.equals(new IntWritable(sources[0]))) {
-    		node.setPageRank((float)StrictMath.log(1.0f));
+    		node.setPageRank(0f); // 0f should == StrictMath.log(1.0f)
     	}
     	else {
     		node.setPageRank(Float.NEGATIVE_INFINITY);
