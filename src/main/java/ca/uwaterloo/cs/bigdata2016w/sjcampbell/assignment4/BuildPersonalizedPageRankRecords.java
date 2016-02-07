@@ -44,6 +44,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     private static final IntWritable nid = new IntWritable();
     private static final PageRankNode node = new PageRankNode();
     private static int[] sources;
+    private static float[] sourcePageRanks;
     
     @Override
     public void setup(Mapper<LongWritable, Text, IntWritable, PageRankNode>.Context context) {
@@ -60,7 +61,8 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     	node.setType(PageRankNode.Type.Complete);
     	
     	// SSPR: All nodes except the source node(s) get a 0 ranking to start.
-    	node.setPageRank(Float.NEGATIVE_INFINITY);	
+    	sourcePageRanks = new float[sources.length];
+    	//node.setPageRankValues(Float.NEGATIVE_INFINITY);	
     }
 
     @Override
@@ -70,13 +72,16 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     	nid.set(Integer.parseInt(arr[0]));
     	node.setNodeId(Integer.parseInt(arr[0]));
     	
-    	// SSPR: Use only the first node for personalized single source PR
-    	if (nid.equals(new IntWritable(sources[0]))) {
-    		node.setPageRank(0f); // 0f should == StrictMath.log(1.0f)
+    	// Set page ranks to 1 only in source nodes. 
+    	for (int i = 0; i < sources.length; i++) {
+    		if (nid.equals(new IntWritable(sources[i]))) {
+    			sourcePageRanks[i] = 0.0f; // 0.0f == StrictMath.log(1.0f)
+        	}	
+    		else {
+    			sourcePageRanks[i] = Float.NEGATIVE_INFINITY;
+    		}
     	}
-    	else {
-    		node.setPageRank(Float.NEGATIVE_INFINITY);
-    	}
+    	node.setPageRanks(sourcePageRanks);
 
     	if (arr.length == 1) {
     		node.setAdjacencyList(new ArrayListOfIntsWritable());

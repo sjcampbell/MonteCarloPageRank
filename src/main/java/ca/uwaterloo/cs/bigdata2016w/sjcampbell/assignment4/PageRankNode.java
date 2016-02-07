@@ -37,15 +37,22 @@ public class PageRankNode implements Writable {
   private int nodeid;
   private float pagerank;
   private ArrayListOfIntsWritable adjacenyList;
+  private float[] pageranks;
 
   public PageRankNode() {}
 
-  public float getPageRank() {
-    return pagerank;
+  public void setPageRanks(float[] p) {
+	  this.pageranks = p;
   }
-
-  public void setPageRank(float p) {
-    this.pagerank = p;
+  
+  public float[] getPageRanks() {
+	  return this.pageranks;
+  }
+  
+  public void setPageRankValues(float value) {
+	  for (int i = 0; i < pageranks.length; i++) {
+		  pageranks[i] = value;
+	  }
   }
 
   public int getNodeId() {
@@ -84,16 +91,25 @@ public class PageRankNode implements Writable {
     nodeid = in.readInt();
 
     if (type.equals(Type.Mass)) {
-      pagerank = in.readFloat();
-      return;
+    	pageranks = readPageRanks(in);
+    	return;
     }
 
     if (type.equals(Type.Complete)) {
-      pagerank = in.readFloat();
+    	pageranks = readPageRanks(in);
     }
 
     adjacenyList = new ArrayListOfIntsWritable();
     adjacenyList.readFields(in);
+  }
+  
+  private float[] readPageRanks(DataInput in) throws IOException {
+	  int length = in.readInt();
+	  float[] ranks = new float[length];
+	  for (int i = 0; i < length; i++) {
+		  ranks[i] = in.readFloat();
+	  }
+	  return ranks;
   }
 
   /**
@@ -107,15 +123,22 @@ public class PageRankNode implements Writable {
     out.writeInt(nodeid);
 
     if (type.equals(Type.Mass)) {
-      out.writeFloat(pagerank);
+      writePageRanks(pageranks, out);
       return;
     }
 
     if (type.equals(Type.Complete)) {
-      out.writeFloat(pagerank);
+    	writePageRanks(pageranks, out);
     }
 
     adjacenyList.write(out);
+  }
+  
+  private void writePageRanks(float[] ranks, DataOutput out) throws IOException {
+	  out.writeInt(ranks.length);
+	  for (int i = 0; i < ranks.length; i++) {
+		  out.writeFloat(ranks[i]);
+	  }
   }
 
   @Override
