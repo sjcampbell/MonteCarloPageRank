@@ -40,8 +40,9 @@ import com.google.common.base.Preconditions;
 /**
  * <p>
  * Main driver program for running the basic implementation of PageRank.
- * Original authors: Jimmy Lin, Michael Schatz Modified for assignment 4 of Big
- * Data Infrastructure by Sam Campbell, Winter 2016
+ * Original authors: Jimmy Lin, Michael Schatz 
+ * Modified for assignment 4 of Big Data Infrastructure by Sam Campbell, 
+ * Winter 2016. Added multi-source parallel PageRank
  * </p>
  *
  * <p>
@@ -214,13 +215,13 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			context.getCounter(PageRank.massMessagesReceived).increment(massMessagesReceived);
 
 			// TODO: Remove after debugging
-			if (nid.equals(new IntWritable(367))) {
-				System.out.print("!! Reducer !! masses: ");
+/*			if (nid.equals(new IntWritable(367))) {
+				System.out.print("!! Reducer !! masses for node 367: ");
 				for (int i = 0; i < sources.length; i++) {
-					System.out.print(masses[i] + ", ");
+					System.out.print(StrictMath.exp(masses[i]) + ", ");
 				}
 				System.out.println();
-			}
+			}*/
 			
 			// Error checking.
 			if (structureReceived == 1) {
@@ -256,14 +257,12 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			Preconditions.checkNotNull(taskId);
 			Preconditions.checkNotNull(path);
 
-//			LOG.info("TaskID: " + taskId);
-//			LOG.info("Total PageRank Masses: " + totalMasses);
 			// TODO: Remove after debugging
-			System.out.print("!! Total PageRank Masses: ");
+			/*System.out.print("!! Total PageRank Masses: ");
 			for (int i = 0; i < sources.length; i++) {
-				System.out.print(totalMasses[i] + ", ");
+				System.out.print(StrictMath.exp(totalMasses[i]) + ", ");
 			}
-			System.out.println();
+			System.out.println();*/
 
 			// Write to a file the amount of PageRank mass we've seen in this
 			// reducer.
@@ -296,18 +295,25 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 
 			Configuration conf = context.getConfiguration();
 			String massesStr = conf.get("MissingMasses");
-			missingMasses = new FloatArrayStringable(massesStr); 
+			missingMasses = new FloatArrayStringable(massesStr);
+			
+			// TODO: Remove after debugging
+			/*System.out.println("!! Mising masses in phase 2 mapper: " + massesStr);
+			for (int ind = 0; ind < sources.length; ind++) {
+				System.out.println("Mass: " + missingMasses.get(ind));
+			}
+			System.out.println();
+			*/
 		}
 
 		@Override
 		public void map(IntWritable nid, PageRankNode node, Context context) throws IOException, InterruptedException {
-			// Random jumps always go back to source node(s), and all missing
-			// mass gets put back in source node(s)
+			// Random jumps always go back to source node(s), and all missing mass gets put back in source node(s)
 
 			float[] pageRanks = node.getPageRanks();
 			
 			for (int i = 0; i < sources.length; i++) {
-				if (nid.equals(sources[i])) {
+				if (nid.equals(new IntWritable(sources[i]))) {
 					float p = pageRanks[i];
 					float jump = (float) StrictMath.log(ALPHA);
 					float link = (float) StrictMath.log(1.0f - ALPHA) + sumLogProbs(p, (float)StrictMath.log(missingMasses.get(i)));
@@ -410,12 +416,13 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 		// Find out how much PageRank mass got lost at the dangling nodes.
 		int[] sourceNums = parseSourceNumbers(sources);
 		
-		String[] sourceStrs = sources.split(",");
-		System.out.println("Masses for sources: " + sources);
+		// TODO: Remove after debugging
+/*		String[] sourceStrs = sources.split(",");
+		System.out.println("!! Masses for sources: " + sources);
 		for (int ind = 0; ind < sourceStrs.length; ind++) {
 			System.out.println("logMass: " + masses[ind] + ", Mass: " + StrictMath.exp(masses[ind]));
 		}
-		System.out.println();
+		System.out.println();*/
 		
 		FloatArrayStringable missingMasses = new FloatArrayStringable(sourceNums.length, 0.0f);
 		for (int ind = 0; ind < sourceNums.length; ind++) {
@@ -481,7 +488,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 		System.out.println("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
 		int[] sourceNums = parseSourceNumbers(sources);
-		float[] masses = new float[sourceNums.length];
+		float[] masses = initializeFloatArray(sourceNums.length);
 		
 		FileSystem fs = FileSystem.get(getConf());
 		for (FileStatus f : fs.listStatus(new Path(outm))) {
@@ -494,8 +501,9 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			fin.close();
 		}
 
+		System.out.println();
 		System.out.println("!! PHASE 1 COMPLETE !!");
-		
+
 		return masses;
 	}
 
@@ -520,7 +528,7 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 		job.getConfiguration().set("MissingMasses", missing.toString());
 		job.getConfiguration().setInt("NodeCount", numNodes);
 		job.getConfiguration().set("Sources", sources);
-
+		
 		job.setNumReduceTasks(0);
 
 		FileInputFormat.setInputPaths(job, new Path(in));
@@ -544,7 +552,6 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 		System.out.println("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
 		System.out.println("!! PHASE 2 COMPLETE !!");
-		System.out.println();
 	}
 
 	private int countPartitions(String in) throws FileNotFoundException, IOException {
@@ -602,13 +609,5 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			throw new RuntimeException("Sources configuration was not found.");
 		}
 		return sources;
-	}
-	
-	private void logCounters(Job job) throws IOException {
-		System.out.println("!! nodes: " + job.getCounters().findCounter(PageRank.nodes).getValue());
-		System.out.println("!! edges: " + job.getCounters().findCounter(PageRank.edges).getValue());
-		System.out.println("!! massMessages: " + job.getCounters().findCounter(PageRank.massMessages).getValue());
-		System.out.println("!! massMessagesReceived: " + job.getCounters().findCounter(PageRank.massMessagesReceived).getValue());
-		System.out.println("!! missingStructure: " + job.getCounters().findCounter(PageRank.missingStructure).getValue());
 	}
 }

@@ -222,7 +222,8 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
     LOG.info("!! Beginning job. !!");
     job.waitForCompletion(true);
     
-    //printPageRanks(job.getConfiguration(), outputPath, parseSourceString(sources));
+    Path filePath = new Path(outputPath + "/part-r-00000");
+    printPageRanks(job.getConfiguration(), filePath, parseSourceString(sources));
 
     return 0;
   }
@@ -235,20 +236,26 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
     System.exit(res);
   }
   
-  private void printPageRanks(Configuration conf, String inputPath, int[] sources) throws URISyntaxException, IOException {
-	  // SSPR: only print first source as a start.
-
-	  Path filePath = new Path(inputPath + "/part-r-00000");
+  public void printPageRanks(Configuration conf, Path filePath, int[] sources) throws URISyntaxException, IOException {
 	  FileSystem fs = FileSystem.get(conf);
 	  FSDataInputStream in = fs.open(filePath);
 	  BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 	  
 	  try {
 		  String line;
+		  int currentSource = -1;
 		  while((line = reader.readLine()) != null) {
-			  String[] nodeIdPageRank = line.split("\t");
-			  int nodeId = Integer.parseInt(nodeIdPageRank[0]);
-			  float pageRank = Float.parseFloat(nodeIdPageRank[1]);
+			  String[] splitLine = line.split("[(),\t]");
+			  int sourceId = Integer.parseInt(splitLine[1].trim());
+			  int nodeId = Integer.parseInt(splitLine[2].trim());
+			  float pageRank = Float.parseFloat(splitLine[4].trim());
+			  
+			  if (sourceId != currentSource) {
+				  System.out.println();
+				  System.out.println("Source: " + sourceId);
+				  currentSource = sourceId;
+			  }
+			  
 			  System.out.println(String.format("%.5f %d", StrictMath.exp(pageRank), nodeId));
 		  }
 	  }
