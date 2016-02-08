@@ -51,15 +51,10 @@ public class ExtractTopPersonalizedPageRankNodes extends Configured implements T
     public void setup(Context context) throws IOException {
     	int k = context.getConfiguration().getInt("n", 100);
     	sources = getSources(context);
-
-    	LOG.info("!! Mapper, sources length: " + sources.length);
-    	
     	sourceQueues = new ArrayList<TopScoredObjects<Integer>>(sources.length);
     	for (int i = 0; i < sources.length; i++) {
     		sourceQueues.add(new TopScoredObjects<Integer>(k));
     	}
-    	
-    	LOG.info("!! Mapper setup complete.");
     }
 
     @Override

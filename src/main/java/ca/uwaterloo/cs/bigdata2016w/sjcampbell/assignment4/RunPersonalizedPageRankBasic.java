@@ -214,15 +214,6 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			node.setPageRanks(masses);
 			context.getCounter(PageRank.massMessagesReceived).increment(massMessagesReceived);
 
-			// TODO: Remove after debugging
-/*			if (nid.equals(new IntWritable(367))) {
-				System.out.print("!! Reducer !! masses for node 367: ");
-				for (int i = 0; i < sources.length; i++) {
-					System.out.print(StrictMath.exp(masses[i]) + ", ");
-				}
-				System.out.println();
-			}*/
-			
 			// Error checking.
 			if (structureReceived == 1) {
 				// Everything checks out, emit final node structure with updated PageRank value.
@@ -257,13 +248,6 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			Preconditions.checkNotNull(taskId);
 			Preconditions.checkNotNull(path);
 
-			// TODO: Remove after debugging
-			/*System.out.print("!! Total PageRank Masses: ");
-			for (int i = 0; i < sources.length; i++) {
-				System.out.print(StrictMath.exp(totalMasses[i]) + ", ");
-			}
-			System.out.println();*/
-
 			// Write to a file the amount of PageRank mass we've seen in this
 			// reducer.
 			FileSystem fs = FileSystem.get(context.getConfiguration());
@@ -296,14 +280,6 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 			Configuration conf = context.getConfiguration();
 			String massesStr = conf.get("MissingMasses");
 			missingMasses = new FloatArrayStringable(massesStr);
-			
-			// TODO: Remove after debugging
-			/*System.out.println("!! Mising masses in phase 2 mapper: " + massesStr);
-			for (int ind = 0; ind < sources.length; ind++) {
-				System.out.println("Mass: " + missingMasses.get(ind));
-			}
-			System.out.println();
-			*/
 		}
 
 		@Override
@@ -416,17 +392,10 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
 		// Find out how much PageRank mass got lost at the dangling nodes.
 		int[] sourceNums = parseSourceNumbers(sources);
 		
-		// TODO: Remove after debugging
-/*		String[] sourceStrs = sources.split(",");
-		System.out.println("!! Masses for sources: " + sources);
-		for (int ind = 0; ind < sourceStrs.length; ind++) {
-			System.out.println("logMass: " + masses[ind] + ", Mass: " + StrictMath.exp(masses[ind]));
-		}
-		System.out.println();*/
-		
 		FloatArrayStringable missingMasses = new FloatArrayStringable(sourceNums.length, 0.0f);
 		for (int ind = 0; ind < sourceNums.length; ind++) {
-			missingMasses.set(ind, 1.0f - (float)StrictMath.exp(masses[ind]));
+			float missing = 1.0f - (float)StrictMath.exp(masses[ind]);
+			missingMasses.set(ind, Math.max(0.0f, missing));
 		}
 
 		// Job 2: distribute missing mass, take care of random jump factor.
