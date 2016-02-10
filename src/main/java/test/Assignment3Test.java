@@ -16,7 +16,7 @@ import ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3.DocumentPostings;
 import ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3.PairOfVInts;
 import ca.uwaterloo.cs.bigdata2016w.sjcampbell.assignment3.PostingsBuffer;
 
-public class AssignmentTesting {
+public class Assignment3Test {
 	
 	@Test
 	public void PairOfVIntsSerialization() throws IOException, ClassNotFoundException {
