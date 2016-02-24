@@ -31,3 +31,24 @@ List of University of Wisconsin–Madison people in academics
 **Question 4.** _What are the Wikipedia articles (just the article titles) retrieved in response to the query "internet startup AND canada AND ontario AND"?_  
 Amazon.com   
 Criticism of Facebook  
+
+Marks
+
+Q1 5
+Q2a 5
+Q2b 5
+Q3 5
+
+Q4 5
+Q5a 4
+Q5b 4
+Q6 4
+
+AC 5
+LC 5
+
+Total 47
+
+Comments
+- Index size much smaller than Jimmy's
+- Altiscale queries output full document 
