@@ -27,9 +27,6 @@ object Q1 extends {
         val sc = new SparkContext(conf)
         sc.setJobDescription("Count how many items where shipped on a particular date.")
         
-        val outputDir = new Path("q1-output")
-        FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
-        
         var itemCount = sc.accumulator(0)
         val lineItems = sc.textFile(args.input() + "/lineitem.tbl")
         val date = args.date()
