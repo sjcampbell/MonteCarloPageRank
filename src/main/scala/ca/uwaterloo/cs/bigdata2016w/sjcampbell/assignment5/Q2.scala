@@ -39,7 +39,7 @@ object Q2 {
         FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
         
         // First, build each PairRDD with the keys required for the reduce-side (cogroup) join
-        var lineItemKeyed = lineItems.map(line => {
+        val lineItemKeyed = lineItems.map(line => {
             val lineItemRow = line.split("\\|")
             (lineItemRow(0).toInt, lineItemRow(10))   
         })
