@@ -103,9 +103,9 @@ object Q4 {
                 nationCounts
             }
         }
-        
-        .reduceByKey(_ + _)
+        .reduceByKey(_ + _)  // Sum counts for each nation 
         .sortByKey()
+        .collect()
         .foreach {
             case ((nationKey, nationName), count) => {
                 println(nationKey, nationName, count)
