@@ -31,13 +31,13 @@ object Q1 extends {
         val lineItems = sc.textFile(args.input() + "/lineitem.tbl")
         val date = args.date()
         
-        lineItems.map(line => {
+        lineItems.foreach(line => {
             val shipdate = line.split("\\|")(10)
             if (shipdate.startsWith(date)) {
                 itemCount += 1
             }
         })
         
-        println("ANSWER=" + itemCount)
+        println("ANSWER=" + itemCount.value)
     }
 }
