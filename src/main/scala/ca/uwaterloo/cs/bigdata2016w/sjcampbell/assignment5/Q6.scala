@@ -50,14 +50,14 @@ object Q6 {
         lineItems.map(line => {
             val lineItemRow = line.split("\\|")
             ((lineItemRow(LineItemColumns.returnFlag), lineItemRow(LineItemColumns.lineStatus)),
-            (lineItemRow(LineItemColumns.quantity).toFloat,
-            lineItemRow(LineItemColumns.extendedPrice).toFloat,
-            lineItemRow(LineItemColumns.discount).toFloat,
-            lineItemRow(LineItemColumns.tax).toFloat,
-            lineItemRow(LineItemColumns.shipDate), 1))
+            (lineItemRow(LineItemColumns.quantity).toDouble,
+            lineItemRow(LineItemColumns.extendedPrice).toDouble,
+            lineItemRow(LineItemColumns.discount).toDouble,
+            lineItemRow(LineItemColumns.tax).toDouble,
+            lineItemRow(LineItemColumns.shipDate)))
         })
         .map {
-            case ((returnFlag, lineStatus), (quantity, extendedPrice, discount, tax, shipDate, count)) => {
+            case ((returnFlag, lineStatus), (quantity, extendedPrice, discount, tax, shipDate)) => {
                 if (shipDate.startsWith(date)) {
                     ((returnFlag, lineStatus), new Q6Calculation(quantity, extendedPrice, discount, tax))
                 }
@@ -76,33 +76,34 @@ object Q6 {
             case (((returnFlag, lineStatus), calculation)) => {
                 println((returnFlag, 
                         lineStatus, 
-                        calculation.quantity, 
-                        calculation.basePrice,
-                        calculation.discPriceSum,
-                        calculation.chargeSum,
-                        calculation.quantity / calculation.count,
-                        calculation.basePrice / calculation.count,
-                        calculation.discPriceSum / calculation.count,
+                        calculation.quantitySum, 
+                        calculation.basePriceSum,
+                        calculation.discountCalc,
+                        calculation.chargeCalc,
+                        calculation.quantitySum / calculation.count,
+                        calculation.basePriceSum / calculation.count,
+                        calculation.discountSum / calculation.count,
                         calculation.count))
             }
         }
     }
 }
 
-class Q6Calculation(var quantity: Float, var basePrice: Float, var discount: Float, var tax: Float) {
+class Q6Calculation(var quantity: Double, var basePrice: Double, var discount: Double, var tax: Double) {
     var count = 1
-    var discPriceSum = 0f
-    var chargeSum = 0f
-    
+    var discountCalc = basePrice * (1.0 - discount)
+    var chargeCalc = basePrice * (1.0 - discount) * (1.0 + tax)
+    var discountSum = discount
+    var basePriceSum = basePrice
+    var quantitySum = quantity
+
     def add(add: Q6Calculation) {
         count = count + add.count
-        quantity = quantity + add.quantity
-        basePrice = basePrice + add.basePrice
-        discount = discount + add.discount
+        quantitySum = quantitySum + add.quantitySum
+        basePriceSum = basePriceSum + add.basePriceSum
         tax = tax + add.tax
-        
-        discPriceSum = discPriceSum + (add.basePrice * (1 - add.discount))
-        chargeSum = chargeSum + (add.basePrice * (1 - add.discount) * (1 + add.tax))
+        discountSum = discountSum + add.discountSum
+        discountCalc = discountCalc + add.discountCalc
+        chargeCalc = chargeCalc + add.chargeCalc
     }
 }
-
