@@ -44,9 +44,6 @@ object Q6 {
         
         val date = args.date()
         
-        val outputDir = new Path("q6-output")
-		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
-        
 		// Further optimizations
 		// =====================
 		// * Vectorized execution

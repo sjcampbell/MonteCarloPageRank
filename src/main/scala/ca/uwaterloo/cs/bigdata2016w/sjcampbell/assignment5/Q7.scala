@@ -83,13 +83,12 @@ object Q7 {
         val sc = new SparkContext(conf)
         sc.setJobDescription("Retrieves unshipped orders with the 10 highest values")
         
-        val outputDir = new Path("q7-output")
-		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
-        
         val date = args.date()
         
         val lineItems = getFilteredLineItems(args.input(), sc, date)
         val orders = getFilteredOrders(args.input(), sc, date)
+        
+        val customers = getCustomersKeyed(args.input(), sc).collectAsMap()
         
         lineItems.cogroup(orders)
         .flatMap {
@@ -97,15 +96,9 @@ object Q7 {
 
                 var rows = List[((Int, Int, String, Int), Double)]()
                 
-                var revenue = 0.0
-                
                 for (lineItem <- lineItemIter; order <- orderIter) {
-
-                    // sum(extendedPrice, * (1 - discount))
-                    revenue = revenue + lineItem._1 * (1.0 - lineItem._2)
-                    
-                    // (custKey, orderKey, orderDate, shipPriority), revenue
-                    rows = ((order._1, orderKey, order._2, order._3), revenue) +: rows 
+                    // (custKey, orderKey, orderDate, shipPriority), revenue (extendedPrice, * (1 - discount))
+                    rows = ((order._1, orderKey, order._2, order._3), lineItem._1 * (1.0 - lineItem._2)) +: rows 
                 }
                 
                 rows
@@ -116,31 +109,9 @@ object Q7 {
         .takeOrdered(10)(Ordering[Double].reverse.on { x => x._2 })
         .foreach {
             case ((custKey, orderKey, orderDate, shipPriority), revenue) => {
-                println(custKey, orderKey, revenue, orderDate, shipPriority)
+                val customerName = customers.get(custKey)
+                println(customerName, orderKey, revenue, orderDate, shipPriority)
             }
         }
-        
-        /*
-         * 	select
-         * 		c_name,
-         *   	l_orderkey,
-         *     	sum(l_extendedprice*(1-l_discount)) as revenue,
-         *      o_orderdate,
-         *      o_shippriority
-         *	from customer, orders, lineitem
-         * 	where
-         *  	c_custkey = o_custkey and
-         *  	l_orderkey = o_orderkey and
-         *  	o_orderdate < "1996-01-01" and
-         *  	l_shipdate > "1996-01-01"
-         *  group by
-         *  	c_name,
-         *  	l_orderkey,
-         *  	o_orderdate,
-         *  	o_shippriority
-         *  order by
-         *  	revenue desc
-         *  limit 10;
-         */
     }
 }
