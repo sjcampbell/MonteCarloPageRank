@@ -37,6 +37,7 @@ object Q6 {
         log.info("Executors: " + args.numExecutors())
         
         val conf = new SparkConf().setAppName("Q6 - Monthly shipments")
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         conf.registerKryoClasses(Array(classOf[Q6Calculation]))
         val sc = new SparkContext(conf)
         sc.setJobDescription("Reports the amount of business that was billed, shipped, and returned")
@@ -46,6 +47,11 @@ object Q6 {
         val outputDir = new Path("q6-output")
 		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
         
+		// Further optimizations
+		// =====================
+		// * Vectorized execution
+		// * Pre-compile calculations
+		
         val lineItems = sc.textFile(args.input() + "/lineitem.tbl")
         lineItems.map(line => {
             val lineItemRow = line.split("\\|")
