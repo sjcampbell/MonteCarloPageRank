@@ -110,7 +110,7 @@ object Q7 {
         .foreach {
             case ((custKey, orderKey, orderDate, shipPriority), revenue) => {
                 val customerName = customers.get(custKey)
-                println(customerName, orderKey, revenue, orderDate, shipPriority)
+                println(customerName.get, orderKey, revenue, orderDate, shipPriority)
             }
         }
     }
