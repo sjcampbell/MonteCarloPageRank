@@ -9,39 +9,28 @@ import org.rogach.scallop._
 
 object TrainSpamClassifier {
     
-    val delta = 0.2
+    val delta = 0.002
     
     val log = Logger.getLogger(getClass().getName())
     
     def main(argv: Array[String]) {
-        val args = new Conf(argv)
+        val args = new TrainConf(argv)
         log.info("Input: " + args.input())
         log.info("Model: " + args.model())
-        log.info("Executors: " + args.numExecutors())
         
         val conf = new SparkConf().setAppName("A6 - Spam Classifier")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Training spam classifier using stochastic gradient descent.")
         
-        val outputDir = new Path(args.model())
-		FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
+        val modelDir = new Path(args.model())
+		FileSystem.get(sc.hadoopConfiguration).delete(modelDir, true)
         
         runSparkJob(sc, args.input(), args.model())
     }
     
     def runSparkJob(sc: SparkContext, input: String, model: String) {
         val textFile = sc.textFile(input)
-        val trained = textFile.map(line => { 
-            // Parse input
-            val split = line.split(" ")
-            val docid = split(0)
-            val isSpam = if (split(1) == "spam") 1 else 0
-            
-            val features = split.drop(2).map(f => f.toInt)
-            
-            (0, (docid, isSpam, features))
-        })
-        .groupByKey(1)
+        val trained = textFile.map(parseLine).groupByKey(1)
 
         trained.flatMap {
             case (key, instances) => {
@@ -49,21 +38,32 @@ object TrainSpamClassifier {
                 instances.foreach {
                     case (docid, isSpam, features) => {
                         val score = spamminess(features, weights)
-                        val prob = 1.0 / (1 + Math.exp(score))
+                        val prob = 1.0 / (1.0 + Math.exp(-score))
                         features.foreach(f => {
                             if (weights.contains(f)) {
-                                weights = weights.updated(f, (weights(f) + (isSpam - prob) * delta))   
+                                weights = weights.updated(f, (weights(f) + (isSpam - prob) * delta))
                             }
                             else {
-                                weights += (f -> 1.0)
+                                weights += (f -> (isSpam - prob) * delta)
                             }
                         })
                     }
                 }
+                
                 weights
             }
-        }        
+        }
         .saveAsTextFile(model);
+    }
+    
+    def parseLine(line: String): (Int, (String, Double, Array[Int])) = {
+        val split = line.split(" ")
+        val docid = split(0)
+        val isSpam = if (split(1) == "spam") 1.0 else 0.0
+        
+        val features = split.drop(2).map(f => f.toInt)
+        
+        (0, (docid, isSpam, features))
     }
     
     def spamminess(features: Array[Int], weights: Map[Int, Double]) : Double = {
