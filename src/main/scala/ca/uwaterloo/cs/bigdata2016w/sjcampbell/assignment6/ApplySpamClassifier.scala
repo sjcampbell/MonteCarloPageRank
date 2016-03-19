@@ -43,10 +43,10 @@ object ApplySpamClassifier {
         .saveAsTextFile(output)
     }
     
-    def parseInputLine(line: String) : (String, Int, Array[Int]) = {
+    def parseInputLine(line: String) : (String, String, Array[Int]) = {
         val split = line.split(" ")
         val docid = split(0)
-        val isSpam = if (split(1) == "spam") 1 else 0
+        val isSpam = split(1)
         
         val features = split.drop(2).map(f => f.toInt)
         
