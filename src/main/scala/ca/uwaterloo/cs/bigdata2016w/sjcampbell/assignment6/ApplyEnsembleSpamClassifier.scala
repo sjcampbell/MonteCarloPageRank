@@ -9,7 +9,6 @@ import org.rogach.scallop._
 
 object ApplyEnsembleSpamClassifier {
     val log = Logger.getLogger(getClass().getName())
-    val lineParser = new LineParser()
     val spamClassifier = new SpamClassifier()
     
     def main(argv: Array[String]) {
@@ -20,6 +19,7 @@ object ApplyEnsembleSpamClassifier {
         log.info("Method: " + args.method())
         
         val conf = new SparkConf().setAppName("A6 - Apply Ensemble Spam Classifier")
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Classifies a document as spam or ham using ensemble techniques.")
         
@@ -30,15 +30,15 @@ object ApplyEnsembleSpamClassifier {
     }
     
     def runSparkJob(sc: SparkContext, input: String, output: String, modelDir: String, method: String) {
-        val weights0 = sc.textFile(modelDir + "/part-00000").map(lineParser.parseModelLine).collectAsMap()
-        val weights1 = sc.textFile(modelDir + "/part-00001").map(lineParser.parseModelLine).collectAsMap()
-        val weights2 = sc.textFile(modelDir + "/part-00002").map(lineParser.parseModelLine).collectAsMap()
+        val weights0 = sc.textFile(modelDir + "/part-00000").map(parseModelLine).collectAsMap()
+        val weights1 = sc.textFile(modelDir + "/part-00001").map(parseModelLine).collectAsMap()
+        val weights2 = sc.textFile(modelDir + "/part-00002").map(parseModelLine).collectAsMap()
         
         val bcWeights0 = sc.broadcast(weights0)
         val bcWeights1 = sc.broadcast(weights1)
         val bcWeights2 = sc.broadcast(weights2)
         
-        val testData = sc.textFile(input).map(lineParser.parseDataLine)
+        val testData = sc.textFile(input).map(parseDataLine)
         
         testData.map {
             case (docid, isSpam, features) => {
@@ -64,5 +64,22 @@ object ApplyEnsembleSpamClassifier {
         var score = 0d
         features.foreach(f => if (weights.contains(f)) score += weights(f))
         score
+    }
+    
+    def parseDataLine(line: String) : (String, String, Array[Int]) = {
+        val split = line.split(" ")
+        val docid = split(0)
+        val isSpam = split(1)
+        
+        val features = split.drop(2).map(f => f.toInt)
+        
+        (docid, isSpam, features)
+    }
+    
+    def parseModelLine(line: String) : (Int, Double) = {
+        val split = line.split("[\\(,\\)]")
+
+        // feature, weight 
+        (split(1).toInt, split(2).toDouble)
     }
 }

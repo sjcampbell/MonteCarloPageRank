@@ -18,6 +18,7 @@ object ApplySpamClassifier {
         log.info("Model: " + args.model())
         
         val conf = new SparkConf().setAppName("A6 - Apply Spam Classifier")
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Classifies a document as spam or ham.")
         
@@ -29,13 +30,13 @@ object ApplySpamClassifier {
     
     def runSparkJob(sc: SparkContext, input: String, output: String, model: String) {
 
-        val weights = sc.textFile(model).map(parseModelLine).collectAsMap()
+        val bcWeights = sc.broadcast(sc.textFile(model).map(parseModelLine).collectAsMap())
         
         val testData = sc.textFile(input).map(parseInputLine)
         
         testData.map {
             case (docid, isSpam, features) => {
-                val sp = spamminess(features, weights)
+                val sp = spamminess(features, bcWeights.value)
                 val predictedSpam = if (sp > 0) "spam" else "ham"
                 (docid, isSpam, sp, predictedSpam)
             }

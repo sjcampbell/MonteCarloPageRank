@@ -10,9 +10,8 @@ import org.rogach.scallop._
 object TrainSpamClassifier {
     
     val delta = 0.002
-    
+    val random = scala.util.Random
     val log = Logger.getLogger(getClass().getName())
-    val lineParser = new LineParser()
     
     def main(argv: Array[String]) {
         val args = new TrainConf(argv)
@@ -22,7 +21,8 @@ object TrainSpamClassifier {
         val shuffle = args.shuffle.isSupplied && args.shuffle()
         log.info("Shuffle: " + shuffle)
         
-        val conf = new SparkConf().setAppName("A6 - Spam Classifier")
+        val conf = new SparkConf().setAppName("A6 - Train Spam Classifier")
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Training spam classifier using stochastic gradient descent.")
         
@@ -36,7 +36,7 @@ object TrainSpamClassifier {
         val textFile = sc.textFile(input)
         
         if (shuffle) {
-            val trained = textFile.map(lineParser.parseDataLineRandomKey)
+            val trained = textFile.map(parseDataLineRandomKey)
                 .sortByKey()
                 .map {
                     case (keyInstance) => {
@@ -65,11 +65,35 @@ object TrainSpamClassifier {
         (0, (docid, isSpam, features))
     }
     
+    def parseDataLineOneKey(line: String): (Int, (String, Double, Array[Int])) = {
+        val split = line.split(" ")
+        val docid = split(0)
+        val isSpam = if (split(1) == "spam") 1.0 else 0.0
+        
+        val features = split.drop(2).map(f => f.toInt)
+        
+        (0, (docid, isSpam, features))
+    }
+    
+    def parseDataLineRandomKey(line: String): (Int, (String, Double, Array[Int])) = {
+        val split = line.split(" ")
+        val docid = split(0)
+        val isSpam = if (split(1) == "spam") 1.0 else 0.0
+        
+        val features = split.drop(2).map(f => f.toInt)
+        
+        (random.nextInt, (docid, isSpam, features))
+    }
+    
     def buildModelWeights(keyedInstances: (Int, Iterable[(String, Double, Array[Int])])): TraversableOnce[(Int, Double)] = {
         var weights = Map[Int, Double]()
         keyedInstances._2.foreach {
             case (docid, isSpam, features) => {
-                val score = spamminess(features, weights)
+                
+                // calculate spamminess here to avoid the extra work on the stack when calculated in a separate method
+                var score = 0d
+                features.foreach(f => if (weights.contains(f)) score += weights(f))
+                
                 val prob = 1.0 / (1.0 + Math.exp(-score))
                 features.foreach(f => {
                     if (weights.contains(f)) {
@@ -83,11 +107,5 @@ object TrainSpamClassifier {
         }
         
         weights
-    }
-    
-    def spamminess(features: Array[Int], weights: Map[Int, Double]) : Double = {
-        var score = 0d
-        features.foreach(f => if (weights.contains(f)) score += weights(f))
-        score
     }
 }
