@@ -12,11 +12,13 @@ object TrainSpamClassifier {
     val delta = 0.002
     
     val log = Logger.getLogger(getClass().getName())
+    val lineParser = new LineParser()
     
     def main(argv: Array[String]) {
         val args = new TrainConf(argv)
         log.info("Input: " + args.input())
         log.info("Model: " + args.model())
+        log.info("Shuffle: " + args.shuffle())
         
         val conf = new SparkConf().setAppName("A6 - Spam Classifier")
         val sc = new SparkContext(conf)
@@ -24,36 +26,31 @@ object TrainSpamClassifier {
         
         val modelDir = new Path(args.model())
 		FileSystem.get(sc.hadoopConfiguration).delete(modelDir, true)
-        
-        runSparkJob(sc, args.input(), args.model())
+		
+        runSparkJob(sc, args.input(), args.model(), args.shuffle())
     }
     
-    def runSparkJob(sc: SparkContext, input: String, model: String) {
+    def runSparkJob(sc: SparkContext, input: String, model: String, shuffle: Boolean) {
         val textFile = sc.textFile(input)
-        val trained = textFile.map(parseLine).groupByKey(1)
-
-        trained.flatMap {
-            case (key, instances) => {
-                var weights = Map[Int, Double]()
-                instances.foreach {
-                    case (docid, isSpam, features) => {
-                        val score = spamminess(features, weights)
-                        val prob = 1.0 / (1.0 + Math.exp(-score))
-                        features.foreach(f => {
-                            if (weights.contains(f)) {
-                                weights = weights.updated(f, (weights(f) + (isSpam - prob) * delta))
-                            }
-                            else {
-                                weights += (f -> (isSpam - prob) * delta)
-                            }
-                        })
+        
+        if (shuffle) {
+            val trained = textFile.map(lineParser.parseDataLineRandomKey)
+                .sortByKey()
+                .map {
+                    case (keyInstance) => {
+                        (0, (keyInstance._2._1, keyInstance._2._2, keyInstance._2._3))
                     }
                 }
-                
-                weights
-            }
+                .groupByKey(1)
+                .flatMap(buildModelWeights)
+                .saveAsTextFile(model)
         }
-        .saveAsTextFile(model);
+        else {
+            val trained = textFile.map(parseLine)
+            .groupByKey(1)
+            .flatMap(buildModelWeights)
+            .saveAsTextFile(model)    
+        }
     }
     
     def parseLine(line: String): (Int, (String, Double, Array[Int])) = {
@@ -64,6 +61,26 @@ object TrainSpamClassifier {
         val features = split.drop(2).map(f => f.toInt)
         
         (0, (docid, isSpam, features))
+    }
+    
+    def buildModelWeights(keyedInstances: (Int, Iterable[(String, Double, Array[Int])])): TraversableOnce[(Int, Double)] = {
+        var weights = Map[Int, Double]()
+        keyedInstances._2.foreach {
+            case (docid, isSpam, features) => {
+                val score = spamminess(features, weights)
+                val prob = 1.0 / (1.0 + Math.exp(-score))
+                features.foreach(f => {
+                    if (weights.contains(f)) {
+                        weights = weights.updated(f, (weights(f) + (isSpam - prob) * delta))
+                    }
+                    else {
+                        weights += (f -> (isSpam - prob) * delta)
+                    }
+                })
+            }
+        }
+        
+        weights
     }
     
     def spamminess(features: Array[Int], weights: Map[Int, Double]) : Double = {
