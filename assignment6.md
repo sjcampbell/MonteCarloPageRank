@@ -16,15 +16,14 @@ britney: 16.82
 16.29  
   
 **Question 5** _Run the shuffle trainer 10 times on the britney dataset, predict and evaluate the classifier on the test data each time. Report the 1-ROCA% score in each of the ten trials and compute the overall average._  
-
-Run 1 :  18.41
-Run 2 :  21.41
-Run 3 :  17.68
-Run 4 :  17.10
-Run 5 :  19.27
-Run 6 :  15.50
-Run 7 :  15.30
-Run 8 :  14.72
-Run 9 :  16.28
-Run 10:  16.95  
+Run 1 :  18.41  
+Run 2 :  21.41  
+Run 3 :  17.68  
+Run 4 :  17.10  
+Run 5 :  19.27  
+Run 6 :  15.50  
+Run 7 :  15.30  
+Run 8 :  14.72  
+Run 9 :  16.28  
+Run 10:  16.95    
 Average: 17.262

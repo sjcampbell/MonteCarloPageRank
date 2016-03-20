@@ -18,7 +18,9 @@ object TrainSpamClassifier {
         val args = new TrainConf(argv)
         log.info("Input: " + args.input())
         log.info("Model: " + args.model())
-        log.info("Shuffle: " + args.shuffle())
+        
+        val shuffle = args.shuffle.isSupplied && args.shuffle()
+        log.info("Shuffle: " + shuffle)
         
         val conf = new SparkConf().setAppName("A6 - Spam Classifier")
         val sc = new SparkContext(conf)
@@ -27,7 +29,7 @@ object TrainSpamClassifier {
         val modelDir = new Path(args.model())
 		FileSystem.get(sc.hadoopConfiguration).delete(modelDir, true)
 		
-        runSparkJob(sc, args.input(), args.model(), args.shuffle())
+        runSparkJob(sc, args.input(), args.model(), shuffle)
     }
     
     def runSparkJob(sc: SparkContext, input: String, model: String, shuffle: Boolean) {
