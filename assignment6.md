@@ -27,3 +27,14 @@ Run 8 :  14.72
 Run 9 :  16.28  
 Run 10:  16.95    
 Average: 17.262
+
+Marks:
+Compilation: 4/4
+TrainSpamClassifier: 15/15
+ApplySpamClassifier: 5/5
+ApplyEnsembleClassifier: 6/6
+Shuffle implementation: 5/5
+Question Answers: 15/15
+Runs on Altiscale: 10/10
+Total: 60/60
+
