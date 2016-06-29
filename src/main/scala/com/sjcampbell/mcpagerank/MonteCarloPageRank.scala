@@ -9,17 +9,9 @@ import org.rogach.scallop._
 
 
 /*
- * 	!!!!!!!TODO!!!!!!!
- * - Initialize pageranks as 1/n instead of 1.
- * - Account for dangling nodes
- * 	-- The hadoop job does this by adding up the total mass successfully distributed to nodes, 
- * 		then at the end, subtracts this from 1.0 to get the missing mass.
- * 	-- Missing mass is divided by the total number of nodes, and distributed evenly amongst all nodes.
- *  -- See line 330-340, here: 
+ *  See Hadoop MapReduce implementation of this PageRank algorithm (Note how verbose it is compared to Spark) 
  *  https://github.com/lintool/bespin/blob/master/src/main/java/io/bespin/java/mapreduce/pagerank/RunPageRankBasic.java
- * 
  */
-
 object MonteCarloPageRank {
   
     val log = Logger.getLogger(getClass().getName())
@@ -66,8 +58,6 @@ object MonteCarloPageRank {
         // Parse input adjacency list into (nodeID, Array[nodeId])
         val adjList = sc.textFile(args.input()).map(parseLine).cache()
         
-        val missingMass = sc.accumulator(0f)
-        
         // Store PageRanks as log values, so that logarithmic arithmetic can be used to not lose precision on such small numbers.
         // Initialize ranks by setting them all to the log(1/nodeCount), which is equivalent to -log(nodeCount).
         val weight = -StrictMath.log(nodeCount).toFloat
@@ -78,16 +68,24 @@ object MonteCarloPageRank {
              * To do this, join the current page ranks with the adjacency list, then distribute weights 
              * accordingly.
              */
+            log.info("ITERATION: " + i)
+            
+            val missingMass = sc.accumulator(0f)
+            
             val contributions = adjList.join(ranks).values.flatMap {
                 case (neighbours, pageRank) => {
-                    // Divide a node's PageRank by the number of neighbours: ln(x) - ln(y) = ln(x/y)
-                    val mass = pageRank - Math.log(neighbours.size).toFloat
-                    
-                    if (neighbours.isEmpty) {
-                        // TODO: This is a dangling node. So add the mass to a missing mass accumulator 
+                    if (neighbours == null || neighbours.isEmpty) {
+                        // This is a dangling node. So add the mass to a missing mass accumulator
+                        missingMass += StrictMath.exp(pageRank).toFloat
+
+                        // Return empty list that will get filtered out since we are in a flatmap function.
+                        List[(Int, Float)]()
                     }
-                    
-                    neighbours.map(neighbourId => (neighbourId, mass))  
+                    else {
+                        // Divide a node's PageRank by the number of neighbours: ln(x) - ln(y) = ln(x/y)
+                        val mass = pageRank - StrictMath.log(neighbours.size).toFloat
+                        neighbours.map(neighbourId => (neighbourId, mass))
+                    }
                 }
             }
             
@@ -97,18 +95,29 @@ object MonteCarloPageRank {
              * that node.
              * Complete calculation by converting back to non-logarithmic PageRank: Math.exp(_)
              */
-            // sum the page ranks for each node
+
+            // Jump = randomJump/nodeCount
+            val jump = (StrictMath.log(randomJump) - StrictMath.log(nodeCount)).toFloat
+
+            // Sum the page ranks for each node
             ranks = contributions.reduceByKey {
                 case (val1, val2) => {
                     (sumLogProbs(val1, val2))
                 }
             }
             
-            //.mapValues(randomJump + (1f - randomJump) * Math.exp(_).toFloat)
+            val missing = missingMass.value
+
+            // Distribute the missing mass from the dangling nodes across all nodes.
+            // Also account for the random jump factor.
+            ranks = ranks.map {
+                case (nodeId, rank) => {
+                    // Mass to distribute = (1 - randomJump) * (currentPageRank + missingMass/nodeCount)
+                    val link =  StrictMath.log(1.0f - randomJump).toFloat + sumLogProbs(rank, (StrictMath.log(missing) - StrictMath.log(nodeCount)).toFloat)
+                    (nodeId, sumLogProbs(jump, link))
+                }
+            }
         }
-        
-        println("Top 100 PageRank Nodes and Values")
-        println("=================================")
 
         ranks.sortBy((nodeRank) => { nodeRank._2 }, false, 1)
             .take(100)

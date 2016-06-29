@@ -3,13 +3,11 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
-  <groupId>ca.uwaterloo.cs.bigdata2016w.sjcampbell</groupId>
-  <artifactId>bigdata2016w</artifactId>
+  <groupId>com.sjcampbell.mcpagerank</groupId>
+  <artifactId>mcpagerank</artifactId>
   <packaging>jar</packaging>
-  <name>BigData2016w</name>
   <version>0.1.0-SNAPSHOT</version>
-  <description>Code for the big data course at the University of Waterloo.</description>
-  <url>https://github.com/sjcampbell/bigdata2016w</url>
+  <url>https://github.com/sjcampbell/MonteCarloPageRank</url>
   <licenses>
     <license>
       <name>The Apache Software License, Version 2.0</name>
@@ -18,9 +16,9 @@
     </license>
   </licenses>
   <scm>
-    <connection>scm:git:git@github.com:sjcampbell/bigdata2016w.git</connection>
-    <developerConnection>scm:git:git@github.com:sjcampbell/bigdata2016w.git</developerConnection>
-    <url>git@github.com:sjcampbell/bigdata2016w.git</url>
+    <connection>scm:git:git@github.com:sjcampbell/MonteCarloPageRank.git</connection>
+    <developerConnection>scm:git:git@github.com:sjcampbell/MonteCarloPageRank.git</developerConnection>
+    <url>git@github.com:sjcampbell/MonteCarloPageRank.git</url>
   </scm>
   <developers>
     <developer>
@@ -189,4 +187,6 @@
 	</dependency>
   </dependencies>
 
+  <description>A modified implementation of PageRank in Spark, using Monte Carlo methods to improve running time performance.</description>
+  <name>MonteCarloPageRank</name>
 </project>

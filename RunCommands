@@ -1,0 +1,22 @@
+ 
+
+Spark PageRank
+==============
+ spark-submit --class com.sjcampbell.mcpagerank.MonteCarloPageRank \
+    target/mcpagerank-0.1.0-SNAPSHOT.jar --input data/p2p-Gnutella08-adj.txt --iterations 1 --nodeCount 6301
+
+Bespin Hadoop PageRank
+======================
+hadoop jar target/bespin-0.1.0-SNAPSHOT.jar io.bespin.java.mapreduce.pagerank.BuildPageRankRecords \
+   -input data/p2p-Gnutella08-adj.txt -output graph-PageRankRecords -numNodes 6301
+
+hadoop fs -mkdir graph-PageRank
+
+hadoop jar target/bespin-0.1.0-SNAPSHOT.jar io.bespin.java.mapreduce.pagerank.PartitionGraph \
+   -input graph-PageRankRecords -output graph-PageRank/iter0000 -numPartitions 5 -numNodes 6301
+
+hadoop jar target/bespin-0.1.0-SNAPSHOT.jar io.bespin.java.mapreduce.pagerank.RunPageRankBasic \
+   -base graph-PageRank -numNodes 6301 -start 0 -end 1 -useCombiner
+
+hadoop jar target/bespin-0.1.0-SNAPSHOT.jar io.bespin.java.mapreduce.pagerank.FindMaxPageRankNodes \
+   -input graph-PageRank/iter0010 -output graph-PageRank-top20 -top 100
