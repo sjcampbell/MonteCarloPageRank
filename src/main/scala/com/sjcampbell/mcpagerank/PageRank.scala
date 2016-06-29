@@ -70,16 +70,11 @@ object MonteCarloPageRank {
              */
             log.info("ITERATION: " + i)
             
-            val missingMass = sc.accumulator(0f)
-            
             val contributions = adjList.join(ranks).values.flatMap {
                 case (neighbours, pageRank) => {
                     if (neighbours == null || neighbours.isEmpty) {
-                        // This is a dangling node. So add the mass to a missing mass accumulator
-                        missingMass += StrictMath.exp(pageRank).toFloat
-
-                        // Return empty list that will get filtered out since we are in a flatmap function.
-                        List[(Int, Float)]()
+                        // Put missing mass with a key that can be extracted during the reduce phase.
+                        List((-1, pageRank))
                     }
                     else {
                         // Divide a node's PageRank by the number of neighbours: ln(x) - ln(y) = ln(x/y)
@@ -96,24 +91,41 @@ object MonteCarloPageRank {
              * Complete calculation by converting back to non-logarithmic PageRank: Math.exp(_)
              */
 
-            // Jump = randomJump/nodeCount
-            val jump = (StrictMath.log(randomJump) - StrictMath.log(nodeCount)).toFloat
-
             // Sum the page ranks for each node
             ranks = contributions.reduceByKey {
                 case (val1, val2) => {
+
+                    if (val1 == Float.NaN || val2 == Float.NaN) {
+                        log.error("***** During reduceByKey, found NaN! *****")
+                    }
+                    
                     (sumLogProbs(val1, val2))
                 }
             }
             
-            val missing = missingMass.value
+            val missingMasses = ranks.lookup(-1)
+            var missingMass = Float.NegativeInfinity
+            if (missingMasses != null && !missingMasses.isEmpty) {
+                missingMass = missingMasses(0)
+                log.info("*** Missing mass was: " + missingMass + " ***")
+            }
+            else {
+                log.warn("*** MissingMasses was null or empty. It should exist! ***")
+            }
 
             // Distribute the missing mass from the dangling nodes across all nodes.
             // Also account for the random jump factor.
+            val jump = (StrictMath.log(randomJump) - StrictMath.log(nodeCount)).toFloat
             ranks = ranks.map {
                 case (nodeId, rank) => {
-                    // Mass to distribute = (1 - randomJump) * (currentPageRank + missingMass/nodeCount)
-                    val link =  StrictMath.log(1.0f - randomJump).toFloat + sumLogProbs(rank, (StrictMath.log(missing) - StrictMath.log(nodeCount)).toFloat)
+                    /* 
+                     * To calculate PageRank for one node (accounting for danglind nodes with no out links),
+                     * the following equation can be used:
+                     *   
+                     *   (1 - randomJump) * (currentPageRank + missingMass/nodeCount) + randomJump/nodeCount
+                     *     
+                     */
+                    val link =  StrictMath.log(1.0f - randomJump).toFloat + sumLogProbs(rank, (missingMass - StrictMath.log(nodeCount)).toFloat)
                     (nodeId, sumLogProbs(jump, link))
                 }
             }
