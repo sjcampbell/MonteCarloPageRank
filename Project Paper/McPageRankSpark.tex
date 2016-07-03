@@ -1,0 +1,162 @@
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+
+%\IEEEoverridecommandlockouts                              % This command is only needed if 
+                                                          % you want to use the \thanks command
+
+\overrideIEEEmargins                                      % Needed to meet printer requirements.
+
+% See the \addtolength command later in the file to balance the column lengths
+% on the last page of the document
+
+% The following packages can be found on http:\\www.ctan.org
+%\usepackage{graphics} % for pdf, bitmapped graphics files
+\usepackage{epsfig} % for postscript graphics files
+%\usepackage{mathptmx} % assumes new font selection scheme installed
+%\usepackage{times} % assumes new font selection scheme installed
+%\usepackage{amssymb}  % assumes amsmath package installed
+%\usepackage{epstopdf}
+
+\usepackage{amsmath}		% assumes amsmath package installed
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+
+\title{\LARGE \bf Monte Carlo PageRank Algorithm Implemented in Apache Spark}
+%
+% Single address.
+% ---------------
+
+\author{Sam Campbell \\  % <-this % stops a space
+University of Waterloo \\
+sj2campb@uwaterloo.ca
+\thanks{$^{1}$ Sam Campbell is with the 
+ School of Computer Science, University of Waterloo,
+200 University Avenue, Waterloo, Ontario, Canada N2L 3G1.        {\tt\small }}%
+}
+
+%
+% Single address.
+% ---------------
+
+
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+%
+\begin{abstract}
+Abstract goes here. Abstract goes here. Abstract goes here. Abstract goes here.
+\end{abstract}
+%
+\begin{keywords}
+xxxxx
+\end{keywords}
+%
+\section{Introduction}
+
+Citation examples: \cite{An82,An09,Go89,Ra10}.
+
+\label{sec:intro}
+The PageRank algorithm has been widely used and researched since its introduction in 1998, due in part to its usefulness for ranking web pages at Google to improve their search platform. Its purpose, when used in the context of web pages, is to rank the “importance” of web pages based on the inter-page link structure. Pages with more links pointing to them get a higher rank. PageRank values can be used for various applications, like ordering search results, browsing, or estimating web site traffic.
+
+The size of the entire web graph is very large and continues to grow, so for the PageRank algorithm to be effective, it should run as efficiently as possible. There is more than one way to compute PageRank. Two of them are discussed in this paper: a Power Iteration (PI) approach and a Monte Carlo (MC) approach. The PageRank algorithm that was presented in 1998 by L. Page, S. Brin, R. Motwani, and T. Winograd [3] uses the PI approach, which uses an iterative matrix-vector multiplication technique to calculate PageRank. A Monte Carlo approach was introduced by K.Avrachenkov et al. in 2007 [1]. You can imaging the MC approach as a series of random walks through the graph and PageRank for a node is relative to the number of times any walk goes through a node.
+
+Much research has gone into improving the performance of PageRank computation, though most research appears to be on improving the performance of the PI approach. More recently, a few MC algorithms were introduced by Das Sarma et al. [2] to calculate PageRank on a distributed system. In their research, they prove theoretically that one of their algorithms runs in O(log(n/E)) number of rounds for directed or undirected graphs (like the web), and another runs in O(sqrt(log(n/E))) rounds for undirected graphs only, however, they did not have an implementation to show their results.
+
+The entire web graph is very large, so even with an efficient algorithm, PageRank may not be able to run very quickly on a single system. The ClueWeb09 dataset contains the structure of the web from 2009. The dataset containing all unique URLs is 325GB uncompressed. One way to tackle the large dataset is to distribute the PageRank algorithm so that multiple computers are working on the calculation at once. This is where Apache Spark comes into play. It was built for fast cluster computing and large-scale data processing.
+
+I’ve implemented an MC PageRank algorithm described by Das Sarma et al. [2] in Spark. They introduce two algorithms: “Basic-PageRank-Algorithm” (BPRA) and “Improved-PageRank-Algorithm” (IPRA). However, only BPRA works for directed graphs like the web, so this paper will focus only on that moving forward. I’ve also implemented a PageRank algorithm using the PI approach in Spark, and I’ve compared the results. I’ve specifically compared the convergence of the algorithms by looking at the PageRank of the 1st page, 10th page, 100th page, and 1000th page to show how the PageRank distribution differs between the two approaches after a number of iterations.
+
+
+\section{PageRank}
+\label{sec:md}
+A PageRank vector for a graph is defined as π, where each element in π represents the PageRank of a node in the graph.
+
+\subsection{PowerIteration PageRank}
+* Describe the random surfer model \\
+* Brief Description of PageRank Power Iteration (PI) Method
+
+\subsection{Monte Carlo PageRank}
+The random surfer model used in the original PageRank computation can also be represented by the MC approach using random walks. In this sense, a single surfer can be represented by one random walk wij, starting at node i and ending at node j. There is a probability, $\epsilon$, that the surfer will click away to a random page, so $(1-\epsilon)$ is the probability that they will follow an outgoing link from their current page. These basic rules can be used to guide the random walk. 
+
+To describe one step in a random walk from node i, a random number would be generated. If the number is below $\epsilon$, then the walk ends. Otherwise, the walk picks one of the outgoing links with equal probability, which would be 1/nO, where nO is the number of outgoing links from the current page. 
+
+During a random walk, each node must record that it has been visited. The total number of visits to node $v$ is denoted by $\zeta_v$. The total number of visits over all nodes of all walks is $\frac{n K}{\epsilon}$. The PageRank for a node v, denoted as $\pi_v$, is estimated by dividing the number of visits to a node by the total number of all visits. The Monte Carlo approach is naturally an approximation of the actual PageRank values, so an estimation of $\pi_v$ is denoted by $\tilde{\pi}_v$. Therefore,
+
+\begin{equation}
+\tilde{\pi}_v = \frac{\zeta_v\epsilon}{n K}
+\end{equation}
+
+There are a few more important notations involved in the algorithm. $T_v^u$ is the number of random walks from $v$ to $u$ in a single round. $B$ is a constant used in calculating the number of rounds that the algorithm should run for: $B\log{n/\epsilon}$.
+This algorithm is laid out by Das Sarma et al. in [2], and is summarized here in algorithm 1.
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+
+\begin{algorithm}
+
+\caption{Basic-PageRank-Algorithm [2]}\label{euclid}
+\textbf{Input:} Number of nodes $n$ and reset probability $\epsilon$ \\
+\textbf{Output:} PageRank of each node \\
+\textbf{[Each node $v$ starts $K$ walks. All walks occur in parallel until they terminate. Termination probability for each walk is $\epsilon$, so the expected walk length is $1/\epsilon$ ]}
+
+\begin{algorithmic}[1]
+\State Each node $v$ maintains a count variable `$couponCount_v$' corresponding to number of random walk coupons held by $v$. Initially, `$couponCount_v = K$' for starting K random walks.
+
+\State Each node $v$ also maintains a counter $\zeta_v$ for counting the number visits of random walks to it. Set $\zeta_v = K$ \\
+
+\For{round $i = 1,2,...,B\log{n/\epsilon}$ } 
+  \State Each node v holding at least one alive coupon (i.e., $couponCount_v \neq 0$) does the following in parallel:
+  \State For every neighbour $u$ of $v$, set $T_u^v = 0$
+  
+  \For {j = 1,2,...,$couponCount_v$}
+    \State With probability $1-\epsilon$, pick a uniformly random outgoing neighbour $u$
+    \State $T_u^v := T_u^v + 1$
+  \EndFor
+
+\State Send the coupon counter number $T_u^v$ to the respective outgoing neighbours $u$.
+
+\State Each node $u$ computes: $\zeta_u = \zeta_u + \sum_{v\in N(u)} {T_u^v}$
+\State Update $couponCount_u = \sum_{v\in N(u)} {T_u^v}$
+
+\EndFor \\
+\State Each node $v$ outputs its PageRank as $\frac{\zeta_v\epsilon}{n K}$
+
+\end{algorithmic}
+\end{algorithm}
+
+\section{Implementation}
+Both the Power Iteration and Monte Carlo algorithms were implemented in Apache Spark. Spark is a system designed for running large-scale distributed computations, and abstracts the low-level details pertaining to managing the complexities of distributed computing. Similar to Hadoop's MapReduce, it brings the computation to where the data is stored. For instance, a large graph could be split up and stored across many servers. To run a Spark program on a distributed dataset, the program is passed to each Spark node, and executed on the node’s portion of the dataset.
+
+\subsection{PowerIteration Implementation}
+Describe PI implementation here
+
+\subsection{Monte Carlo Implementation}
+To describe how Spark implements this algorithm, think of it in terms of a single random walk $w_{ij}$ that goes from node $i$ to node $j$. Only one step of each random walk will be carried out within one iteration. One iteration can be carried out using map-reduce-like functionality. Information will have to be passed from node $i$ to node $j$, but since the graph is distributed, these nodes could be on separate computers. The way this can be handled in Spark is by outputting a key-value pair for each random walk after each iteration, so for a random walk $w_ij$, we can output $(j, 1)$. This shows that a random walk has moved to node $j$. To figure out where the random walk will go next after node $j$, we need to find the outgoing nodes from $j$. Spark infrastructure handles the complicated distributed computing components of this operation by ensuring that this output gets joined back up with the link structure of node $j$, which may or may not be on a different computer in the cluster. This computation will run most efficiently if the graph is distributed in a way that the fewest edges are broken when splitting the graph across Spark systems.
+
+\section{Methods and Data}
+The PageRank implementations were run against a simple graph dataset: the Gnutella perr-to-peer network graph structure from 2002. This dataset is only 128KB, consisting of 6301 nodes. This is basically a toy dataset to test the convergence capabilities of the two PageRank algorithms quickly. Further work could expand upon this by running this on a much larger graph.
+
+TODO: Explain the experiment: convergence.
+
+\section{Results and/or Discussion}
+
+
+
+
+\section{Conclusion}
+
+
+
+\bibliographystyle{IEEEbib}
+\bibliography{McPageRankSpark}
+
+\end{document}
+
+
+

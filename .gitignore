@@ -3,4 +3,5 @@ target/*
 .metadata*
 /target/
 /data/
-/cs489-2016w-sjcampbell-a0-shakespeare/
+*.synctex.gz
+*.swp

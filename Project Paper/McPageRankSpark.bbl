@@ -1,0 +1,25 @@
+\begin{thebibliography}{1}
+
+\bibitem{An82}
+R.R. Anderson and J.A. Parrish,
+\newblock ``Optical properties of human skin,''
+\newblock in {\em The Science of Photomedicine}, J.D. Regan and J.A. Parrish,
+  Eds., N.Y., USA, 1982, pp. 147--194, Plenun Press.
+
+\bibitem{An09}
+C.~Antoniou, J.~Lademann, S.~Schanzer, H.~Richter, W.~Sterry, L.~Zastrow, and
+  S.~Koch,
+\newblock ``Do different ethnic groups need different sun protection?,''
+\newblock {\em Skin Res. Technol.}, vol. 15, no. 3, pp. 323--9, 2009.
+
+\bibitem{Go89}
+G.~Golub and C.~Van Loan,
+\newblock {\em Matrix Computations},
+\newblock John Hopkins University Press, Baltimore, MD, USA, 2nd edition, 1989.
+
+\bibitem{Ra10}
+M.~H. Ravnbak,
+\newblock {\em Objective determination of {F}itzpatrick skin type},
+\newblock Ph.D. thesis, University of Copenhagen, 2010.
+
+\end{thebibliography}

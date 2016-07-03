@@ -83,13 +83,6 @@ object MonteCarloPageRank {
                     }
                 }
             }
-            
-            /* Multiply each PageRank by (1 - randomJump) to scale it, considering it is the
-             * probability that a link will be followed instead of jumping to a random node.
-             * Add 'randomJump' to account for the probability that a random jump will occur to
-             * that node.
-             * Complete calculation by converting back to non-logarithmic PageRank: Math.exp(_)
-             */
 
             // Sum the page ranks for each node
             ranks = contributions.reduceByKey {
@@ -110,7 +103,7 @@ object MonteCarloPageRank {
                 log.info("*** Missing mass was: " + missingMass + " ***")
             }
             else {
-                log.warn("*** MissingMasses was null or empty. It should exist! ***")
+                log.warn("*** MissingMasses was null or empty. It should exist if there are any dangling nodes! ***")
             }
 
             // Distribute the missing mass from the dangling nodes across all nodes.
@@ -119,7 +112,7 @@ object MonteCarloPageRank {
             ranks = ranks.map {
                 case (nodeId, rank) => {
                     /* 
-                     * To calculate PageRank for one node (accounting for danglind nodes with no out links),
+                     * To calculate PageRank for one node (accounting for dangling nodes with no out links),
                      * the following equation can be used:
                      *   
                      *   (1 - randomJump) * (currentPageRank + missingMass/nodeCount) + randomJump/nodeCount

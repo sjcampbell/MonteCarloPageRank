@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2013/Debian)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: McPageRankSpark.aux
+The style file: IEEEbib.bst
+Database file #1: McPageRankSpark.bib
+You've used 4 entries,
+            1838 wiz_defined-function locations,
+            486 strings with 4086 characters,
+and the built_in function-call counts, 984 in all, are:
+= -- 83
+> -- 51
+< -- 1
++ -- 18
+- -- 14
+* -- 74
+:= -- 165
+add.period$ -- 4
+call.type$ -- 4
+change.case$ -- 3
+chr.to.int$ -- 0
+cite$ -- 4
+duplicate$ -- 46
+empty$ -- 89
+format.name$ -- 14
+if$ -- 222
+int.to.chr$ -- 0
+int.to.str$ -- 4
+missing$ -- 4
+newline$ -- 23
+num.names$ -- 6
+pop$ -- 13
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 22
+stack$ -- 0
+substring$ -- 43
+swap$ -- 13
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 0
+while$ -- 8
+width$ -- 5
+write$ -- 49
