@@ -8,11 +8,16 @@ import org.apache.spark.rdd.RDD
 import org.rogach.scallop._
 
 
-/*
+/* Power Iteration PageRank Algorithm for Spark
+ * 
+ *  Sam Campbell
+ *  University of Waterloo
+ *  CS798 Course Project
+ *  
  *  See Hadoop MapReduce implementation of this PageRank algorithm (Note how verbose it is compared to Spark) 
  *  https://github.com/lintool/bespin/blob/master/src/main/java/io/bespin/java/mapreduce/pagerank/RunPageRankBasic.java
  */
-object MonteCarloPageRank {
+object PowerIterationPageRank {
   
     val log = Logger.getLogger(getClass().getName())
     
@@ -51,15 +56,15 @@ object MonteCarloPageRank {
         log.info("Number of Iterations: " + args.iterations())
         log.info("Executors: " + args.numExecutors())
         
-        val conf = new SparkConf().setAppName("BuildPageRankRecords")
+        val conf = new SparkConf().setAppName("PowerIterationPageRank")
         val sc = new SparkContext(conf)
-        sc.setJobDescription("Takes an adjacency list and formats them into records that can be used by PageRank.")
+        sc.setJobDescription("Takes an adjacency list and calculates PageRank for graph nodes.")
         
         // Parse input adjacency list into (nodeID, Array[nodeId])
         val adjList = sc.textFile(args.input()).map(parseLine).cache()
         
         // Store PageRanks as log values, so that logarithmic arithmetic can be used to not lose precision on such small numbers.
-        // Initialize ranks by setting them all to the log(1/nodeCount), which is equivalent to -log(nodeCount).
+        // Initialize ranks by setting them all to log(1/nodeCount), which is equivalent to -log(nodeCount).
         val weight = -StrictMath.log(nodeCount).toFloat
         var ranks = adjList.mapValues(v => weight)
         
