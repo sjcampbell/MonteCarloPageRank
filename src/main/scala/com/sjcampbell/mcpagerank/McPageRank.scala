@@ -43,7 +43,7 @@ object MonteCarloPageRank {
         FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
     }
     
-    def oneIteration(adjList: RDD[(Int, Array[Int])], currentCoupons: RDD[(Int, (Int, Int))]) : RDD[(Int, (Int, Int))] = {
+    def takeRoundOfSteps(adjList: RDD[(Int, Array[Int])], currentCoupons: RDD[(Int, Int)]) : RDD[(Int, Int)] = {
         // MapPartitions is required so that each node can have its own random number generator defined once (per thread), 
         // rather than redefining it for every map iteration.    
         adjList.join(currentCoupons).mapPartitionsWithIndex {
@@ -53,10 +53,10 @@ object MonteCarloPageRank {
                 val rand = new scala.util.Random(randomSeed + index)
                 
                 //val distributed = scala.collection.mutable.ListBuffer[(Int, (Int, Int))]()
-                var distributed = List[(Int,(Int, Int))]() 
+                var distributed = List[(Int, Int)]() 
                 
                 iter.foreach {
-                    case (nodeId, (neighbours, (currentCount, total))) => {
+                    case (nodeId, (neighbours, currentCount)) => {
                         if (neighbours.size > 0) {
                             
                             // Here's where we distribute the walks
@@ -68,7 +68,7 @@ object MonteCarloPageRank {
                                     val r = rand.nextInt(neighbours.size)
                                     val selectedNeighbour = neighbours(r)
 
-                                    distributed = (selectedNeighbour, (1, total)) +: distributed
+                                    distributed = (selectedNeighbour, 1) +: distributed
                                 }
                             }
                         }
@@ -103,7 +103,8 @@ object MonteCarloPageRank {
         
         // Initialize coupons, the term used for the number of random walks at a node.
         // Initialize using a tuple => (<number of walks currently at this node>, <total number of walks that have visited this node>)
-        var currentCoupons = adjList.mapValues(v => (nodeWalkCount, nodeWalkCount))
+        var currentCoupons = adjList.mapValues(v => nodeWalkCount)
+        var walkCounts = currentCoupons.cache()
 
         /*
          * Each iteration will be one walk step for all nodes.
@@ -112,24 +113,27 @@ object MonteCarloPageRank {
         for (i <- 0 to args.iterations()) {
             log.info("ITERATION: " + i)
 
-            val distributedWalks = oneIteration(adjList, currentCoupons)
+            // Move all walks by one step
+            val distributedWalks = takeRoundOfSteps(adjList, currentCoupons)
             
-            // This contains the (nodeID, couponCount) for the next walk step.
-            currentCoupons = distributedWalks.reduceByKey((walks1, walks2) => {
-              (walks1._1 + walks2._1, walks1._1)
-            })
+            // Reduce to sum the couponCount moving to each node.
+            currentCoupons = distributedWalks.reduceByKey(_ + _)
             
-            currentCoupons = currentCoupons.mapValues(x => {
-                // Add walks from this iteration to the total count.
-                (x._1, x._1 + x._2)
-            })
-            
-            currentCoupons.saveAsTextFile("currentCoupons-" + i)
-            
-            /*val newCount = currentCoupons.count()
-            println("*** Iteration " + i + " coupon count: " + newCount + " ***")*/
+            // Add the new walk steps to the visit totals for each node. 
+            walkCounts = currentCoupons.rightOuterJoin(walkCounts).mapValues {
+                case (newWalkCount, totalCount) => {
+                    newWalkCount.getOrElse(0) + totalCount
+                }
+            }.cache()
         }
+        
+        // Get total number of walks
+        val sum = sc.accumulator(0)
+        walkCounts.foreach(wc => sum += wc._2)
+        val totalWalks = sum.value
+        println("*** Total walk steps (visits) taken: " + totalWalks + " ***")
 
-        currentCoupons.sortBy((nodeRank) => { nodeRank._2._2 }, false, 1).saveAsTextFile(outputFile)
+        // Compute and output PageRanks
+        walkCounts.mapValues { x => x.toFloat / totalWalks.toFloat }.sortBy((nodeRank) => { nodeRank._2 }, false, 1).saveAsTextFile(outputFile)
     }
 }
