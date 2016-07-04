@@ -26,6 +26,8 @@ object MonteCarloPageRank {
     
     // Probability that a surfer will jump to a random node = 0.15
     val randomJump = 0.15f
+    val outputFile = "McPageRank-Output"
+    val randomSeed = 1234
     
     def parseLine(line: String) : (Int, Array[Int]) = {
         val parts = line.split("\\s+")
@@ -34,6 +36,49 @@ object MonteCarloPageRank {
             (parts(0).toInt, new Array[Int](0))
         else
             (parts(0).toInt, parts.drop(0).map(_.toInt))
+    }
+    
+    def deleteOutputFile(path: String, sc: SparkContext) = {
+        val outputDir = new Path(path)
+        FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
+    }
+    
+    def oneIteration(adjList: RDD[(Int, Array[Int])], currentCoupons: RDD[(Int, Int)]) : RDD[(Int, Int)] = {
+        // MapPartitions is required so that each node can have its own random number generator defined once (per thread), 
+        // rather than redefining it for every map iteration.    
+        adjList.join(currentCoupons).mapPartitionsWithIndex {
+            case (index, iter) => {
+                // Use the index of the Spark node as a part of the random seed, so that Spark nodes
+                // don't all generate the same random numbers.
+                val rand = new scala.util.Random(randomSeed + index)
+                
+                //val distributed = scala.collection.mutable.ListBuffer[(Int, Int)]()
+                var distributed = List[(Int,Int)]() 
+                
+                iter.foreach {
+                    case (nodeId, (neighbours, currentCount)) => {
+                        if (neighbours.size > 0) {
+                            
+                            // Here's where we distribute the walks
+                            for (j <- 0 to currentCount) {
+                                // Generate random variable to determine if the walk should continue.
+                                val d = rand.nextDouble()
+                                if (d >= randomJump) {
+                                    // Random variable to choose which neighbour the walk should go to next.
+                                    val r = rand.nextInt(neighbours.size)
+                                    val selectedNeighbour = neighbours(r)
+
+                                    distributed = (selectedNeighbour, 1) +: distributed
+                                }
+                            }
+                        }
+                        // Else: There are no neighbours to continue walks from this node, so the walks end.
+                    }
+                }
+                
+                distributed.iterator
+            }
+        }
     }
     
     def main(argv: Array[String]) {
@@ -48,6 +93,7 @@ object MonteCarloPageRank {
         val conf = new SparkConf().setAppName("MonteCarloPageRank")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Takes an adjacency list and calculates PageRank for graph nodes using a Monte Carlo approach with random walks.")
+        deleteOutputFile(outputFile, sc)
         
         // Parse input adjacency list into (nodeID, Array[nodeId])
         val adjList = sc.textFile(args.input()).map(parseLine).cache()
@@ -64,67 +110,30 @@ object MonteCarloPageRank {
          * Each iteration will be one walk step for all nodes.
          * We should keep iterating until all walks are complete. The number of iterations just sets a maximum on the loop 
          */
-        val randomSeed = 1234
-        var stillWalkingCount = sc.accumulator(0)
         for (i <- 0 to args.iterations()) {
             log.info("ITERATION: " + i)
-            log.info("Still walking count: " + stillWalkingCount.value)
 
-            // MapPartitions is required so that each node can have its own random number generator defined once (per thread), 
-            // rather than redefining it for every map iteration.
-            val distributedWalks = adjList.join(currentCoupons).mapPartitionsWithIndex {
-                case (index, iter) => {
-                    // Use the index of the Spark node as a part of the random seed, so that Spark nodes
-                    // don't all generate the same random numbers.
-                    val rand = new scala.util.Random(randomSeed + index)
-                    val distributed = scala.collection.mutable.MutableList[(Int, Int)]()
-                    
-                    iter.map {
-                        case (nodeId, (neighbours, currentCount)) => {
-                            if (neighbours.size > 0) {
-                                for (j <- 0 to currentCount) {
-                                    // Generate random variable to determine if the walk should continue.
-                                    val d = rand.nextDouble()
-                                    if (d >= randomJump) {
-                                        // Random variable to choose which neighbour the walk should go to next.
-                                        val r = rand.nextInt(neighbours.size)
-                                        val selectedNeighbour = neighbours(r)
-
-                                        distributed += ((selectedNeighbour, 1))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    distributed.iterator
-                }
-            }
-
-            // This contains the (nodeID, couponCount) for the next walk step. 
-            currentCoupons = distributedWalks.reduceByKey((x1, x2) => {
-                if (x1 > 0 && x2 > 0) {
-                    stillWalkingCount += 1
-                }
-                
-                (x1 + x2)
-            })
+            val distributedWalks = oneIteration(adjList, currentCoupons)
             
-            // Update the total walk counts by joining and adding the most recent walk counts. 
+            // This contains the (nodeID, couponCount) for the next walk step.
+            currentCoupons = distributedWalks.reduceByKey(_ + _)
+            
+            val newCount = currentCoupons.count()
+            println("*** Iteration " + i + " coupon count: " + newCount + " ***")
+            
+            // Update the total walk counts by joining and adding the most recent walk counts.
             walkTotals = walkTotals.leftOuterJoin(distributedWalks).mapValues(x => (x._1 + x._2.getOrElse(0)))
+            
+            val newWalkTotalCount = walkTotals.count()
+            println("***** Iteration " + i + " walk total count: " + newCount + " *****")
         }
 
         val totalWalks = sc.accumulator(0)
         walkTotals.foreach(keyValue => (totalWalks += keyValue._2))
         val walkTotalSum = totalWalks.value        
-        val ranks = walkTotals.mapValues(v => (v.toFloat / walkTotalSum.toFloat))
         
-        ranks.sortBy((nodeRank) => { nodeRank._2 }, false, 1)
-            .take(100)
-            .foreach {
-                case (nodeId, pageRank) => {
-                    println(nodeId, pageRank)
-                }
-            }
+        println("*** Total number of walks: " + walkTotalSum + " ***")
+        
+        walkTotals.sortBy((nodeRank) => { nodeRank._2 }, false, 1).saveAsTextFile(outputFile)
     }
 }
