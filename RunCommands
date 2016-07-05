@@ -1,3 +1,12 @@
+Gnutella P2P
+============
 spark-submit --class com.sjcampbell.mcpagerank.PageRank target/mcpagerank-0.1.0-SNAPSHOT.jar --input data/p2p-Gnutella08-adj.txt --iterations 1 --node-count 6301
 
 spark-submit --class com.sjcampbell.mcpagerank.MonteCarloPageRank target/mcpagerank-0.1.0-SNAPSHOT.jar --input data/p2p-Gnutella08-adj.txt --iterations 1 --node-count 6301 --walks 1
+
+Stanford Web
+============
+spark-submit --class com.sjcampbell.mcpagerank.PowerIterationPageRank target/mcpagerank-0.1.0-SNAPSHOT.jar --input data/web-stanford-adjacency.txt --iterations 1 --node-count 281731
+
+
+spark-submit --class com.sjcampbell.mcpagerank.ConvertPairsToAdjacencyList target/mcpagerank-0.1.0-SNAPSHOT.jar --input data/p2p-Gnutella31.txt --node-count 1

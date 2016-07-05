@@ -48,10 +48,16 @@ object PowerIterationPageRank {
         return a + StrictMath.log1p(StrictMath.exp(b - a)).toFloat
     }
     
+    def deleteOutputFile(path: String, sc: SparkContext) = {
+        val outputDir = new Path(path)
+        FileSystem.get(sc.hadoopConfiguration).delete(outputDir, true)
+    }
+    
     def main(argv: Array[String]) {
         val args = new Conf(argv)
         val nodeCount = args.nodeCount()
         log.info("Input: " + args.input())
+        log.info("Output: " + args.output())
         log.info("Number of Nodes: " + nodeCount)
         log.info("Number of Iterations: " + args.iterations())
         log.info("Executors: " + args.numExecutors())
@@ -59,6 +65,7 @@ object PowerIterationPageRank {
         val conf = new SparkConf().setAppName("PowerIterationPageRank")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Takes an adjacency list and calculates PageRank for graph nodes.")
+        deleteOutputFile(args.output(), sc)
         
         // Parse input adjacency list into (nodeID, Array[nodeId])
         val adjList = sc.textFile(args.input()).map(parseLine).cache()
@@ -129,12 +136,8 @@ object PowerIterationPageRank {
             }
         }
 
-        ranks.sortBy((nodeRank) => { nodeRank._2 }, false, 1)
-            .take(100)
-            .foreach {
-                case (nodeId, pageRank) => {
-                    println(nodeId, pageRank)
-                }
-            }
+        ranks.mapValues { v => StrictMath.exp(v) } 
+        .sortBy((nodeRank) => { nodeRank._2 }, false, 1)
+        .saveAsTextFile(args.output())
     }
 }

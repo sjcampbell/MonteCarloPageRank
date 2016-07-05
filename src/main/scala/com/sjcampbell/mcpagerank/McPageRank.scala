@@ -26,9 +26,8 @@ object MonteCarloPageRank {
     
     // Probability that a surfer will jump to a random node = 0.15
     val randomJump = 0.15f
-    val outputFile = "McPageRank-Output"
     val randomSeed = 1234
-    
+
     def parseLine(line: String) : (Int, Array[Int]) = {
         val parts = line.split("\\s+")
         
@@ -58,7 +57,6 @@ object MonteCarloPageRank {
                 iter.foreach {
                     case (nodeId, (neighbours, currentCount)) => {
                         if (neighbours.size > 0) {
-                            
                             // Here's where we distribute the walks
                             for (j <- 0 to currentCount) {
                                 // Generate random variable to determine if the walk should continue.
@@ -72,7 +70,7 @@ object MonteCarloPageRank {
                                 }
                             }
                         }
-                        // Else: There are no neighbours to continue walks from this node, so the walks end.
+                        // Else: There are no neighbours to continue walks from this node, so the walks from this node end.
                     }
                 }
                 
@@ -85,6 +83,7 @@ object MonteCarloPageRank {
         val args = new McConf(argv)
         val nodeCount = args.nodeCount()
         log.info("Input: " + args.input())
+        log.info("Output: " + args.output())
         log.info("Number of Nodes: " + nodeCount)
         log.info("Number of Iterations: " + args.iterations())
         log.info("Number of Random Walks per node: " + args.walks())
@@ -93,7 +92,7 @@ object MonteCarloPageRank {
         val conf = new SparkConf().setAppName("MonteCarloPageRank")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Takes an adjacency list and calculates PageRank for graph nodes using a Monte Carlo approach with random walks.")
-        deleteOutputFile(outputFile, sc)
+        deleteOutputFile(args.output(), sc)
         
         // Parse input adjacency list into (nodeID, Array[nodeId])
         val adjList = sc.textFile(args.input()).map(parseLine).cache()
@@ -118,13 +117,9 @@ object MonteCarloPageRank {
             
             // Reduce to sum the couponCount moving to each node.
             currentCoupons = distributedWalks.reduceByKey(_ + _)
-            
-            // Add the new walk steps to the visit totals for each node. 
-            walkCounts = currentCoupons.rightOuterJoin(walkCounts).mapValues {
-                case (newWalkCount, totalCount) => {
-                    newWalkCount.getOrElse(0) + totalCount
-                }
-            }.cache()
+
+            // Add the new walk steps to the visit totals for each node.
+            walkCounts = currentCoupons.union(walkCounts).reduceByKey(_ + _)
         }
         
         // Get total number of walks
@@ -134,6 +129,6 @@ object MonteCarloPageRank {
         println("*** Total walk steps (visits) taken: " + totalWalks + " ***")
 
         // Compute and output PageRanks
-        walkCounts.mapValues { x => x.toFloat / totalWalks.toFloat }.sortBy((nodeRank) => { nodeRank._2 }, false, 1).saveAsTextFile(outputFile)
+        walkCounts.mapValues { x => x.toFloat / totalWalks.toFloat }.sortBy((nodeRank) => { nodeRank._2 }, false, 1).saveAsTextFile(args.output())
     }
 }
