@@ -1,25 +1,26 @@
 \begin{thebibliography}{1}
 
-\bibitem{An82}
-R.R. Anderson and J.A. Parrish,
-\newblock ``Optical properties of human skin,''
-\newblock in {\em The Science of Photomedicine}, J.D. Regan and J.A. Parrish,
-  Eds., N.Y., USA, 1982, pp. 147--194, Plenun Press.
+\bibitem{Page99}
+L.~Page, S.~Brin, R.~Motwani, and T.~Winograd.,
+\newblock ``Fast distributed pagerank computation,''
+\newblock {\em Technical report, Stanford InfoLab}, 1999.
 
-\bibitem{An09}
-C.~Antoniou, J.~Lademann, S.~Schanzer, H.~Richter, W.~Sterry, L.~Zastrow, and
-  S.~Koch,
-\newblock ``Do different ethnic groups need different sun protection?,''
-\newblock {\em Skin Res. Technol.}, vol. 15, no. 3, pp. 323--9, 2009.
+\bibitem{Avra07}
+K.~Avrachenkov, N.~Litvak, D.~Nemirovsky, and N.~Osipova,
+\newblock ``Monte carlo methods in pagerank computation: When one iteration is
+  sufficient,''
+\newblock {\em SIAM Journal on Numerical Analysis SIAM J. Numer. Anal.}, , no.
+  2, pp. 890–904, 2007.
 
-\bibitem{Go89}
-G.~Golub and C.~Van Loan,
-\newblock {\em Matrix Computations},
-\newblock John Hopkins University Press, Baltimore, MD, USA, 2nd edition, 1989.
+\bibitem{Sarma13}
+Atish~Das Sarma, Anisur~Rahaman Molla, Gopal Pandurangan, , and Eli Upfal.,
+\newblock ``Fast distributed pagerank computation,''
+\newblock {\em Computing and Networking Lecture Notes in Computer Science}, pp.
+  11--26, 2013.
 
-\bibitem{Ra10}
-M.~H. Ravnbak,
-\newblock {\em Objective determination of {F}itzpatrick skin type},
-\newblock Ph.D. thesis, University of Copenhagen, 2010.
+\bibitem{Bah11}
+B.~Bahmani, K.~Chakrabarti, and D.~Xin,
+\newblock ``Fast personalized pagerank on mapreduce,''
+\newblock {\em Proc. of ACM SIGMOD Conference}, p. 973–984, 2011.
 
 \end{thebibliography}
