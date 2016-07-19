@@ -24,12 +24,10 @@ object ConvertPairsToAdjacencyList {
     }    
     
     def main(argv: Array[String]) {
-        val args = new Conf(argv)
-        val nodeCount = args.nodeCount()
+        val args = new BuildAdjListConf(argv)
         log.info("Input: " + args.input())
-        log.info("Number of Nodes: " + nodeCount)
         
-        val conf = new SparkConf().setAppName("MonteCarloPageRank")
+        val conf = new SparkConf().setAppName("ConvetPairsToAdjList")
         val sc = new SparkContext(conf)
         sc.setJobDescription("Takes a file that describes a graph by one link on each line and converts it into an adjacency list.")
         
